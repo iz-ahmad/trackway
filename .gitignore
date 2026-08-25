@@ -1,0 +1,28 @@
+# Planning documents. Kept locally, not tracked.
+docs/plans/
+docs/brainstorms/
+engineering-memory-v1-spec.md
+
+# Backstory's own derived state. Records are tracked; these are not.
+.backstory/index.sqlite
+.backstory/index.sqlite-shm
+.backstory/index.sqlite-wal
+.backstory/cache/
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
