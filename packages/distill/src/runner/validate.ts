@@ -21,9 +21,25 @@ const RawActor = z.strictObject({
   id: z.string().min(1).default('unknown'),
 });
 
+/**
+ * Models return acceptedBy as a bare string often enough that rejecting the
+ * batch over it loses good records. Anything that is not an actor object and
+ * not a recognisable actor string falls back to implicit, which is the honest
+ * reading: no human acceptance was recorded.
+ */
+const RawAcceptance = z.union([
+  RawActor,
+  z.string().transform((value) => {
+    const text = value.toLowerCase();
+    if (text.startsWith('human')) return { type: 'human' as const, id: value };
+    if (text.startsWith('agent')) return { type: 'agent' as const, id: value };
+    return 'implicit' as const;
+  }),
+]);
+
 const RawAttribution = z.strictObject({
   proposedBy: RawActor,
-  acceptedBy: z.union([RawActor, z.literal('implicit')]),
+  acceptedBy: RawAcceptance,
 });
 
 export const RawDistillation = z.strictObject({

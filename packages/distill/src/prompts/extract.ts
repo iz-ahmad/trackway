@@ -1,7 +1,6 @@
 import type { MemoryEvent } from '@backstory/core';
 
 const MAX_TEXT_PER_EVENT = 1200;
-const MAX_EVENTS = 200;
 
 /**
  * The extraction prompt.
@@ -91,6 +90,8 @@ Do not reconstruct, infer, or invent it. Record only what was said and done.`;
 export interface PromptInput {
   events: readonly MemoryEvent[];
   adapterId: string;
+  /** Set when a session was split, so the model knows it is seeing a slice. */
+  part?: { index: number; total: number };
 }
 
 /**
@@ -100,9 +101,7 @@ export interface PromptInput {
  * characters, and the decision-bearing content is almost always near the start.
  */
 export function renderTranscript(events: readonly MemoryEvent[]): string {
-  const slice = events.slice(0, MAX_EVENTS);
-
-  return slice
+  return events
     .map((event) => {
       const who = event.actor.type === 'human' ? 'DEVELOPER' : 'AGENT';
       return `[${event.type} | ${who}]\n${summarizePayload(event.payload)}`;
@@ -141,7 +140,11 @@ function collectText(value: unknown, depth = 0): string[] {
 export function buildPrompt(input: PromptInput): string {
   const transcript = renderTranscript(input.events);
 
-  return `${EXTRACTION_INSTRUCTIONS}
+  const partNote = input.part
+    ? `\n\nThis is part ${input.part.index} of ${input.part.total} of one session. Record only what this part shows. Earlier and later parts are handled separately, so do not speculate about what came before or after.`
+    : '';
+
+  return `${EXTRACTION_INSTRUCTIONS}${partNote}
 
 SESSION TRANSCRIPT (agent: ${input.adapterId}, ${input.events.length} events)
 ---

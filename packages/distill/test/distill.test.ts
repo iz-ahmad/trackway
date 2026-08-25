@@ -6,6 +6,7 @@ import {
   InvalidDistillationError,
   RunnerError,
   buildPrompt,
+  chunkEvents,
   createDistiller,
   extractJsonObject,
   renderTranscript,
@@ -306,7 +307,7 @@ describe('the distiller', () => {
     expect(called).toBe(false);
   });
 
-  it('records the offset range the region covered', async () => {
+  it('records the offset range the chunk actually covered', async () => {
     const distill = createDistiller({ runner: stubRunner(JSON.stringify(wellFormed)) });
 
     const records = await distill({
@@ -315,7 +316,9 @@ describe('the distiller', () => {
       fromOffset: 3,
     });
 
-    expect(records?.[0]?.source).toMatchObject({ fromOffset: 3, toOffset: 9 });
+    // Provenance points at the events that produced the record, not at where
+    // the sweep happened to resume from.
+    expect(records?.[0]?.source).toMatchObject({ fromOffset: 4, toOffset: 9 });
   });
 
   it('propagates a validation failure so the sweep can mark the session failed', async () => {
@@ -371,5 +374,216 @@ describe('the Claude runner', () => {
     expect(() => new ClaudeDistillRunner()).not.toThrow();
 
     if (before !== undefined) process.env['ANTHROPIC_API_KEY'] = before;
+  });
+});
+
+describe('chunking a long session', () => {
+  function eventsN(n: number): MemoryEvent[] {
+    return Array.from({ length: n }, (_, i) => eventAt(i, `turn ${i}`));
+  }
+
+  it('keeps a short session as one chunk', () => {
+    const chunks = chunkEvents(eventsN(20), { chunkSize: 120 });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.events).toHaveLength(20);
+  });
+
+  it('splits a long session rather than dropping its tail', () => {
+    // Truncating was the first approach and it silently lost most of a long
+    // session, which read as complete output.
+    const chunks = chunkEvents(eventsN(500), { chunkSize: 120, overlap: 12 });
+
+    expect(chunks.length).toBeGreaterThan(1);
+
+    const covered = new Set(chunks.flatMap((c) => c.events.map((e) => e.source.offset)));
+    expect(covered.size).toBe(500);
+  });
+
+  it('overlaps chunks so a question and its answer are not split apart', () => {
+    const chunks = chunkEvents(eventsN(300), { chunkSize: 100, overlap: 10 });
+
+    const first = chunks[0]!.events.map((e) => e.source.offset);
+    const second = chunks[1]!.events.map((e) => e.source.offset);
+
+    expect(second[0]).toBeLessThan(first[first.length - 1]!);
+  });
+
+  it('records the offset range each chunk covers', () => {
+    const chunks = chunkEvents(eventsN(300), { chunkSize: 100, overlap: 0 });
+
+    expect(chunks[0]?.fromOffset).toBe(0);
+    expect(chunks[0]?.toOffset).toBe(99);
+    expect(chunks.at(-1)?.toOffset).toBe(299);
+  });
+
+  it('handles an empty session', () => {
+    expect(chunkEvents([])).toEqual([]);
+  });
+
+  it('distils every chunk of a long session', async () => {
+    let calls = 0;
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      async run() {
+        calls += 1;
+        return JSON.stringify({ discoveries: [{ text: `finding from call ${calls}` }] });
+      },
+    };
+
+    const records = await createDistiller({ runner, chunkSize: 50 })({
+      descriptor,
+      events: eventsN(400),
+      fromOffset: -1,
+    });
+
+    expect(calls).toBeGreaterThan(1);
+    expect(records!.length).toBeGreaterThan(1);
+  });
+
+  it('collapses a decision that appears in two overlapping chunks', async () => {
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      // Every chunk reports the same discovery, as an overlap would produce.
+      async run() {
+        return JSON.stringify({ discoveries: [{ text: 'the same finding every time' }] });
+      },
+    };
+
+    const records = await createDistiller({ runner, chunkSize: 50 })({
+      descriptor,
+      events: eventsN(400),
+      fromOffset: -1,
+    });
+
+    // Identity is content-derived, so duplicates collapse without comparison.
+    const ids = new Set(records!.map((r) => r.id));
+    expect(ids.size).toBe(records!.length);
+  });
+
+  it('keeps the records from chunks that worked when one chunk fails', async () => {
+    let call = 0;
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      async run() {
+        call += 1;
+        if (call === 2) throw new Error('rate limited');
+        return JSON.stringify({ discoveries: [{ text: `finding ${call}` }] });
+      },
+    };
+
+    const records = await createDistiller({ runner, chunkSize: 50 })({
+      descriptor,
+      events: eventsN(300),
+      fromOffset: -1,
+    });
+
+    expect(records!.length).toBeGreaterThan(0);
+  });
+
+  it('fails the session only when every chunk fails', async () => {
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      async run() {
+        throw new RunnerError('stub', 'exit', 'rate limited');
+      },
+    };
+
+    // The original error type survives, because the sweep distinguishes a
+    // runner failure from invalid model output.
+    await expect(
+      createDistiller({ runner, chunkSize: 50 })({
+        descriptor,
+        events: eventsN(300),
+        fromOffset: -1,
+      }),
+    ).rejects.toThrow(RunnerError);
+  });
+
+  it('reports when a session is capped rather than capping silently', async () => {
+    const messages: string[] = [];
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      async run() {
+        return JSON.stringify({});
+      },
+    };
+
+    await createDistiller({
+      runner,
+      chunkSize: 20,
+      maxChunks: 2,
+      onProgress: (m) => messages.push(m),
+    })({ descriptor, events: eventsN(400), fromOffset: -1 });
+
+    expect(messages.join(' ')).toContain('cap reached');
+  });
+
+  it('tells the model when it is seeing one part of a larger session', () => {
+    const prompt = buildPrompt({
+      events: [eventAt(0, 'hello')],
+      adapterId: 'claude-code',
+      part: { index: 2, total: 5 },
+    });
+
+    expect(prompt).toContain('part 2 of 5');
+    expect(prompt).toContain('do not speculate');
+  });
+});
+
+describe('tolerating model attribution slips', () => {
+  it('reads acceptedBy given as a bare string', () => {
+    const output = {
+      decisions: [
+        {
+          question: 'Which cache?',
+          choice: 'Redis',
+          reason: 'Already deployed.',
+          alternatives: [],
+          attribution: { proposedBy: { type: 'agent', id: 'agent:x' }, acceptedBy: 'human:local' },
+        },
+      ],
+    };
+
+    const decision = toRecords(JSON.stringify(output), provenance).find((r) => r.type === 'decision');
+
+    expect(decision?.type === 'decision' && decision.attribution.acceptedBy).toEqual({
+      type: 'human',
+      id: 'human:local',
+    });
+  });
+
+  it('falls back to implicit rather than inventing a human approval', () => {
+    const output = {
+      decisions: [
+        {
+          question: 'Which cache?',
+          choice: 'Redis',
+          reason: 'Already deployed.',
+          alternatives: [],
+          attribution: { proposedBy: { type: 'agent', id: 'agent:x' }, acceptedBy: 'unclear' },
+        },
+      ],
+    };
+
+    const decision = toRecords(JSON.stringify(output), provenance).find((r) => r.type === 'decision');
+
+    // "unclear" is not a person. Recording implicit is the honest reading.
+    expect(decision?.type === 'decision' && decision.attribution.acceptedBy).toBe('implicit');
   });
 });

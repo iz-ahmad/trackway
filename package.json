@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsc --build && npm run build --workspace @backstory/ui",
     "typecheck": "tsc --build --force && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"

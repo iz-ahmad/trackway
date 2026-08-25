@@ -7,6 +7,8 @@ import {
   runSweep,
   type SweepResult,
 } from '@backstory/distill';
+import { isolate } from '@backstory/core';
+import { join } from 'node:path';
 import { openWorkspaceIndex, type Workspace } from './workspace.js';
 
 export interface SyncResult {
@@ -29,7 +31,21 @@ export interface SyncOptions {
  * failure must be reported rather than raised. Interrupting the developer's
  * coding session is the one outcome this system must never cause.
  */
+const EMPTY: SyncResult = {
+  sweep: { swept: [], skipped: [], failures: [], deferred: 0 },
+  written: 0,
+  skippedExisting: 0,
+  purgedCacheFiles: 0,
+};
+
 export async function sync(workspace: Workspace, options: SyncOptions = {}): Promise<SyncResult> {
+  return isolate(() => runSync(workspace, options), EMPTY, {
+    operation: 'sync',
+    logPath: join(workspace.cacheDir, 'failures.log'),
+  });
+}
+
+async function runSync(workspace: Workspace, options: SyncOptions): Promise<SyncResult> {
   const registry = defaultRegistry();
   const distill = createDistiller({ runner: new ClaudeDistillRunner() });
 
@@ -42,7 +58,14 @@ export async function sync(workspace: Workspace, options: SyncOptions = {}): Pro
   });
 
   const records = sweep.swept.flatMap((session) => session.records);
-  const { written, skipped } = await persist(workspace, records);
+
+  // Persisting is isolated separately from sweeping. A locked index or an
+  // unwritable store must not discard the sweep that already succeeded.
+  const { written, skipped } = await isolate(
+    () => persist(workspace, records),
+    { written: 0, skipped: 0 },
+    { operation: 'persist', logPath: join(workspace.cacheDir, 'failures.log') },
+  );
 
   const purge = await purgeCache(
     workspace.cacheDir,
