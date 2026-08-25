@@ -6,6 +6,9 @@
     },
     {
       "path": "./packages/adapters"
+    },
+    {
+      "path": "./packages/distill"
     }
   ]
 }

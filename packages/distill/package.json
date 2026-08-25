@@ -1,0 +1,14 @@
+{
+  "name": "@backstory/distill",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "dependencies": {
+    "@backstory/adapters": "*",
+    "@backstory/core": "*",
+    "zod": "^4.0.0"
+  }
+}
