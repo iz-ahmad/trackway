@@ -7,3 +7,7 @@ export * from './runner/claude.js';
 export * from './runner/validate.js';
 export * from './prompts/extract.js';
 export * from './distiller.js';
+export * from './eval/ground-truth.js';
+export * from './eval/score.js';
+export * from './eval/run.js';
+export * from './eval/judge.js';

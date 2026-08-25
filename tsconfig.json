@@ -9,6 +9,9 @@
     },
     {
       "path": "./packages/distill"
+    },
+    {
+      "path": "./packages/cli"
     }
   ]
 }

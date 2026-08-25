@@ -1,0 +1,17 @@
+{
+  "name": "backstory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "backstory": "./dist/bin.js" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "dependencies": {
+    "@backstory/adapters": "*",
+    "@backstory/core": "*",
+    "@backstory/distill": "*",
+    "commander": "^12.1.0",
+    "yaml": "^2.5.0"
+  }
+}

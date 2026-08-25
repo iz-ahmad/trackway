@@ -1,0 +1,106 @@
+#!/usr/bin/env node
+import { Command } from 'commander';
+import {
+  consoleIo,
+  decisionsCommand,
+  forgetCommand,
+  initCommand,
+  rebuildCommand,
+  rejectedCommand,
+  searchCommand,
+  sessionsCommand,
+  showCommand,
+  statusCommand,
+  syncCommand,
+} from './commands/index.js';
+
+/**
+ * Every command exits zero unless the user asked for something that does not
+ * exist. A non-zero exit from a hook-triggered sweep would surface as an error
+ * inside the developer's coding session, which is the one thing this must not
+ * do.
+ */
+async function main(): Promise<void> {
+  const program = new Command();
+
+  program
+    .name('backstory')
+    .description('The history behind your code.')
+    .version('0.1.0')
+    .showHelpAfterError();
+
+  program
+    .command('init')
+    .description('set up Backstory in this repository')
+    .option('--no-hook', 'skip installing the agent hook')
+    .action(async (options) => process.exit(await initCommand(options, consoleIo)));
+
+  program
+    .command('sync')
+    .description('distil sessions that have gone quiet')
+    .option('-q, --quiet', 'print nothing on success')
+    .option('--max <n>', 'stop after this many sessions', Number)
+    .action(async (options) => process.exit(await syncCommand(options, consoleIo)));
+
+  program
+    .command('status')
+    .description('what is stored, which agents are found, what is pending')
+    .action(async (options) => process.exit(await statusCommand(options, consoleIo)));
+
+  program
+    .command('search <query>')
+    .description('search everything recorded')
+    .option('-t, --type <type>', 'question, discovery, decision, action or outcome')
+    .option('-n, --limit <n>', 'maximum results', Number)
+    .option('--json', 'machine-readable output')
+    .option('--no-sync', 'do not catch up before searching')
+    .action(async (query, options) => process.exit(await searchCommand(query, options, consoleIo)));
+
+  program
+    .command('rejected [query]')
+    .description('options that were considered and not taken')
+    .option('-n, --limit <n>', 'maximum results', Number)
+    .option('--json', 'machine-readable output')
+    .action(async (query, options) =>
+      process.exit(await rejectedCommand(query, options, consoleIo)),
+    );
+
+  program
+    .command('decisions')
+    .description('decisions, newest first')
+    .option('-a, --actor <who>', 'human or agent')
+    .option('--implicit', 'only decisions the agent made without explicit approval')
+    .option('-n, --limit <n>', 'maximum results', Number)
+    .option('--json', 'machine-readable output')
+    .action(async (options) => process.exit(await decisionsCommand(options, consoleIo)));
+
+  program
+    .command('show <id>')
+    .description('one record in full')
+    .option('--json', 'machine-readable output')
+    .action(async (id, options) => process.exit(await showCommand(id, options, consoleIo)));
+
+  program
+    .command('sessions')
+    .description('sessions that produced records')
+    .option('--json', 'machine-readable output')
+    .action(async (options) => process.exit(await sessionsCommand(options, consoleIo)));
+
+  program
+    .command('forget <target>')
+    .description('remove a record, or every record from a session')
+    .option('-s, --session', 'treat the target as a session id')
+    .action(async (target, options) => process.exit(await forgetCommand(target, options, consoleIo)));
+
+  program
+    .command('rebuild')
+    .description('rebuild the search index from the record files')
+    .action(async (options) => process.exit(await rebuildCommand(options, consoleIo)));
+
+  await program.parseAsync(process.argv);
+}
+
+main().catch((error: unknown) => {
+  process.stderr.write(`backstory: ${String(error instanceof Error ? error.message : error)}\n`);
+  process.exit(1);
+});

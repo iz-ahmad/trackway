@@ -62,7 +62,14 @@ export const RawDistillation = z.strictObject({
     .array(
       z.strictObject({
         text: z.string().min(1),
-        result: z.enum(['passed', 'failed', 'unresolved']),
+        /**
+         * Models return an empty string here often enough that rejecting the
+         * batch over it would throw away good records for a field that is a
+         * label rather than content.
+         */
+        result: z
+          .union([z.enum(['passed', 'failed', 'unresolved']), z.literal('')])
+          .transform((value) => (value === '' ? ('unresolved' as const) : value)),
       }),
     )
     .default([]),
