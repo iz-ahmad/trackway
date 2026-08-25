@@ -121,9 +121,15 @@ The server exposes no write tool. Records are created by distillation only.
 
 Extraction quality is measured against an answer key the sessions provide themselves. When an agent presents an explicit list of options, that list is stored as structured data: the question, every option, and its rationale. 44 of 110 real sessions carry one, giving 178 known decision points with no hand labelling.
 
-Measured on a six-session sample: **precision 0.58, recall 0.13**.
+Measured across 7 sessions of 15 to 260 events: **precision 0.57, recall 0.68, F1 0.62**.
 
-Precision is usable. Recall is not, and it is the honest number to show. The extractor is deliberately conservative, and a first attempt made it worse by capping each session at 200 events, so long sessions were silently cut off. That is fixed by chunking, and the next pass measures whether it helped. Nothing gates a release on these numbers, by design: suppressing a useful record to protect a score is the wrong trade.
+Read that scope carefully. Recall on **large** sessions is unmeasured. An earlier run that included sessions of 17 and 27 decision points scored recall 0.06 and 0.11 on them, because the extractor capped each session at 200 events and silently ignored the rest. Chunking fixes that cap and full coverage is verified directly, but the recall it produces on a long session has not been measured, because those sessions cost 13 model calls each and were scoped out to make the run finish.
+
+Of the two sessions common to both runs, one was unchanged and one improved. So the difference between the old aggregate and this one is mostly which sessions were sampled, not only the fix.
+
+Precision near 0.57 means roughly two in five records are not in the answer key. Some of those are real extractions the key does not contain, since the key only covers decisions the agent recorded as an explicit option list. Others are noise.
+
+Nothing gates a release on these numbers, by design. Suppressing a useful record to protect a score is the wrong trade.
 
 Run it yourself:
 

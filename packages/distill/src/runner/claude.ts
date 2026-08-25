@@ -2,7 +2,12 @@ import { spawn } from 'node:child_process';
 import { RunnerError, type DistillRunner, type RunOptions } from './contract.js';
 
 const RUNNER_ID = 'claude-code';
-const DEFAULT_TIMEOUT_MS = 120_000;
+/**
+ * Raised from 120s after a real eval run lost a session to a timeout. A chunk
+ * of 120 events with long tool output is a large request, and losing the whole
+ * session costs more than waiting longer for it.
+ */
+const DEFAULT_TIMEOUT_MS = 300_000;
 
 /** Extraction is a structured task, so it defaults to the cheap fast model. */
 export const DEFAULT_DISTILL_MODEL = 'claude-haiku-4-5-20251001';
