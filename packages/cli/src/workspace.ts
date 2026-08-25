@@ -13,6 +13,8 @@ export const INDEX_FILE = 'index.sqlite';
 
 export interface Workspace {
   repoRoot: string;
+  /** Set when the config file exists but was unusable. Surfaced by status. */
+  configProblem?: string;
   storeDir: string;
   recordsDir: string;
   cacheDir: string;
@@ -39,12 +41,13 @@ export async function loadWorkspace(from?: string): Promise<Workspace | null> {
   const repoRoot = await findRepoRoot(from);
   if (!repoRoot) return null;
 
-  const config = await readConfig(repoRoot);
+  const { config, problem } = await readConfigResult(repoRoot);
   const storeDir = resolve(repoRoot, config.storePath);
 
   return {
     repoRoot,
     storeDir,
+    ...(problem === undefined ? {} : { configProblem: problem }),
     recordsDir: join(storeDir, 'records'),
     // The cache holds parsed session content, so it lives outside the repo
     // entirely. A misconfigured ignore rule should not be able to commit it.
@@ -54,18 +57,57 @@ export async function loadWorkspace(from?: string): Promise<Workspace | null> {
   };
 }
 
-export async function readConfig(repoRoot: string): Promise<BackstoryConfig> {
+export interface ConfigResult {
+  config: BackstoryConfig;
+  /** Set when a config file exists but could not be used. */
+  problem?: string;
+}
+
+/**
+ * Reads the config, reporting why it was rejected rather than defaulting quietly.
+ *
+ * Silently substituting defaults for an invalid config is how a setting appears
+ * to have no effect. Setting quietWindowMinutes to 0 does exactly that: zero
+ * fails validation, the file is discarded, and the tool behaves as though the
+ * edit never happened.
+ */
+export async function readConfigResult(repoRoot: string): Promise<ConfigResult> {
   for (const dir of ['.backstory', '.memory']) {
+    let raw: string;
     try {
-      const raw = await readFile(join(repoRoot, dir, CONFIG_FILE), 'utf8');
-      const parsed = BackstoryConfig.safeParse(parseYaml(raw) ?? {});
-      if (parsed.success) return parsed.data;
+      raw = await readFile(join(repoRoot, dir, CONFIG_FILE), 'utf8');
     } catch {
-      // Try the next location, then fall back to defaults.
+      continue; // No config in this location.
     }
+
+    let parsedYaml: unknown;
+    try {
+      parsedYaml = parseYaml(raw) ?? {};
+    } catch (error) {
+      return {
+        config: BackstoryConfig.parse({}),
+        problem: `${dir}/${CONFIG_FILE} is not valid YAML (${String(error).slice(0, 120)}); using defaults`,
+      };
+    }
+
+    const parsed = BackstoryConfig.safeParse(parsedYaml);
+    if (parsed.success) return { config: parsed.data };
+
+    const detail = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+
+    return {
+      config: BackstoryConfig.parse({}),
+      problem: `${dir}/${CONFIG_FILE} was rejected (${detail}); using defaults`,
+    };
   }
 
-  return BackstoryConfig.parse({});
+  return { config: BackstoryConfig.parse({}) };
+}
+
+export async function readConfig(repoRoot: string): Promise<BackstoryConfig> {
+  return (await readConfigResult(repoRoot)).config;
 }
 
 export async function writeConfig(storeDir: string, config: BackstoryConfig): Promise<void> {

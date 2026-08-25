@@ -42,6 +42,11 @@ async function requireWorkspace(io: Io): Promise<Workspace | null> {
     io.err(NOT_A_REPO);
     return null;
   }
+
+  // A rejected config must never look like no config. Otherwise an edit
+  // appears to have no effect and there is nothing to explain why.
+  if (workspace.configProblem) io.err(`warning: ${workspace.configProblem}`);
+
   return workspace;
 }
 

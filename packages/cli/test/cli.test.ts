@@ -16,6 +16,7 @@ import {
   loadWorkspace,
   persist,
   readConfig,
+  readConfigResult,
   rejectedCommand,
   searchCommand,
   sessionsCommand,
@@ -402,5 +403,69 @@ describe('commands outside a repository', () => {
       process.chdir(repo);
       await rm(loose, { recursive: true, force: true });
     }
+  });
+});
+
+describe('an unusable config file', () => {
+  it('reports why it was rejected instead of defaulting silently', async () => {
+    // Found by using the tool: setting quietWindowMinutes to 0 fails validation,
+    // the file was discarded, and the setting appeared to have no effect with
+    // nothing said about it.
+    const storeDir = join(repo, '.backstory');
+    await mkdir(storeDir, { recursive: true });
+    await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: 0\n', 'utf8');
+
+    const result = await readConfigResult(repo);
+
+    expect(result.config.quietWindowMinutes).toBe(15);
+    expect(result.problem).toContain('quietWindowMinutes');
+    expect(result.problem).toContain('using defaults');
+  });
+
+  it('reports invalid YAML separately from an invalid value', async () => {
+    const storeDir = join(repo, '.backstory');
+    await mkdir(storeDir, { recursive: true });
+    await writeFile(join(storeDir, 'config.yml'), 'quietWindow: [unclosed\n', 'utf8');
+
+    const result = await readConfigResult(repo);
+
+    expect(result.problem).toContain('not valid YAML');
+  });
+
+  it('reports an unknown key rather than ignoring it', async () => {
+    const storeDir = join(repo, '.backstory');
+    await mkdir(storeDir, { recursive: true });
+    await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: 20\nverbose: true\n', 'utf8');
+
+    const result = await readConfigResult(repo);
+
+    // A typo in a key name would otherwise look like it worked.
+    expect(result.problem).toBeTruthy();
+  });
+
+  it('says nothing when the config is valid', async () => {
+    await writeConfig(join(repo, '.backstory'), BackstoryConfig.parse({ quietWindowMinutes: 20 }));
+
+    const result = await readConfigResult(repo);
+
+    expect(result.problem).toBeUndefined();
+    expect(result.config.quietWindowMinutes).toBe(20);
+  });
+
+  it('says nothing when there is no config at all', async () => {
+    const result = await readConfigResult(repo);
+
+    expect(result.problem).toBeUndefined();
+  });
+
+  it('surfaces the problem through a command rather than hiding it', async () => {
+    const storeDir = join(repo, '.backstory');
+    await mkdir(storeDir, { recursive: true });
+    await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: -5\n', 'utf8');
+
+    const io = captureIo();
+    await searchCommand('anything', { noSync: true }, io);
+
+    expect(io.errors.join('\n')).toContain('warning:');
   });
 });
