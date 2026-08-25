@@ -5,3 +5,7 @@ export * from './models/config.js';
 export * from './ids/derive.js';
 export * from './store/serialize.js';
 export * from './store/store.js';
+export * from './index/schema.js';
+export * from './index/upsert.js';
+export * from './index/build.js';
+export * from './search/query.js';

@@ -9,6 +9,7 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "yaml": "^2.9.0",
     "zod": "^4.0.0"
   }
