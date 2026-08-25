@@ -1,5 +1,6 @@
 import type { MemoryRecord } from '@backstory/core';
 import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
+import { collapseNearDuplicates } from './dedupe.js';
 import { buildPrompt } from './prompts/extract.js';
 import type { DistillRunner } from './runner/contract.js';
 import { toRecords } from './runner/validate.js';
@@ -87,8 +88,9 @@ export function createDistiller(options: DistillerOptions): Distiller {
       throw failures[0];
     }
 
-    // Chunks overlap, so the same decision can surface twice. Identity is
-    // content-derived, which collapses them without any comparison.
-    return dedupe(records);
+    // Two passes. Identical records collapse on their id; records that say the
+    // same thing in different words need comparing, because the model rewords
+    // between chunks and a hash of different words is a different hash.
+    return collapseNearDuplicates(dedupe(records));
   };
 }

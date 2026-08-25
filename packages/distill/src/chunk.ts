@@ -9,14 +9,23 @@ import type { MemoryEvent } from '@backstory/core';
 export const DEFAULT_CHUNK_SIZE = 120;
 
 /**
- * Events repeated at the start of the next chunk.
+ * Events repeated at the start of the next chunk. Zero by default.
  *
- * A decision is often stated a few turns after the question that prompted it.
- * Cutting between the two loses both: the question looks unanswered and the
- * decision looks unmotivated. Overlapping costs a little duplication, which
- * content-derived ids collapse anyway.
+ * Overlap was 12, on the reasoning that a decision is often stated a few turns
+ * after the question prompting it, and cutting between them loses both.
+ * Dogfooding showed the cost is worse than the benefit: the same decision
+ * appeared in both chunks and came back worded differently each time, so four
+ * records described one decision. Content-derived ids cannot collapse those,
+ * and lexical comparison cannot either. Measured against real pairs, true
+ * duplicates scored 0.33 to 0.86 while genuinely different decisions reached
+ * 0.50, so no threshold separates them.
+ *
+ * Disjoint chunks cannot produce that duplication at all. The failure it
+ * reintroduces is benign by comparison: a decision spanning a boundary is
+ * recorded as a question in one chunk and a decision in the next, and both
+ * records are individually true and useful.
  */
-export const DEFAULT_OVERLAP = 12;
+export const DEFAULT_OVERLAP = 0;
 
 export interface Chunk {
   events: MemoryEvent[];

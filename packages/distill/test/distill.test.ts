@@ -1,4 +1,4 @@
-import type { MemoryEvent, SessionDescriptor } from '@backstory/core';
+import { withDerivedId, type MemoryEvent, type SessionDescriptor } from '@backstory/core';
 import { describe, expect, it } from 'vitest';
 import {
   ClaudeDistillRunner,
@@ -7,6 +7,7 @@ import {
   RunnerError,
   buildPrompt,
   chunkEvents,
+  collapseNearDuplicates,
   createDistiller,
   extractJsonObject,
   renderTranscript,
@@ -430,7 +431,21 @@ describe('chunking a long session', () => {
       },
       async run() {
         calls += 1;
-        return JSON.stringify({ discoveries: [{ text: `finding from call ${calls}` }] });
+        // Genuinely different subjects. Texts differing only by a digit would
+        // collapse, correctly, since a digit is not a content word.
+        const subjects = [
+          'the queue worker never starts under mocked services',
+          'pagination breaks past the tenth page of results',
+          'webhook delivery fires twice for a single event',
+          'the migration lock is held across an entire deploy',
+          'image uploads bypass the virus scanner entirely',
+          'session cookies are issued without a secure flag',
+          'the search index rebuild blocks all writes',
+          'retry backoff resets on every transient failure',
+        ];
+        return JSON.stringify({
+          discoveries: [{ text: subjects[calls % subjects.length] ?? `finding ${calls}` }],
+        });
       },
     };
 
@@ -621,5 +636,172 @@ describe('tolerating model attribution slips', () => {
 
     // "unclear" is not a person. Recording implicit is the honest reading.
     expect(decision?.type === 'decision' && decision.attribution.acceptedBy).toBe('implicit');
+  });
+});
+
+describe('collapsing records that say the same thing twice', () => {
+  function dec(question: string, choice: string, alternatives: number = 0) {
+    return {
+      id: `dec-${question.length}-${choice.length}`,
+      type: 'decision' as const,
+      sessionId: 'ses-1',
+      episodeId: null,
+      createdAt: '2026-08-25T09:00:00Z',
+      source: {
+        adapter: 'claude-code',
+        sessionId: 'ses-1',
+        sessionFile: '/tmp/a.jsonl',
+        fromOffset: 0,
+        toOffset: 5,
+      },
+      question,
+      choice,
+      reason: 'because',
+      alternatives: Array.from({ length: alternatives }, (_, i) => ({
+        choice: `option ${i}`,
+        status: 'rejected' as const,
+        reason: 'no',
+        condition: null,
+      })),
+      attribution: {
+        proposedBy: { type: 'agent' as const, id: 'agent:x' },
+        acceptedBy: 'implicit' as const,
+      },
+      status: 'accepted' as const,
+      supersededBy: null,
+      relationships: [],
+    };
+  }
+
+  it('collapses a near-identical restatement', () => {
+    const collapsed = collapseNearDuplicates([
+      dec('Scale chunks?', 'Scale chunk size to fit available call budget for complete coverage'),
+      dec('Scale chunks?', 'Scale chunk size to fit call budget for complete coverage'),
+    ]);
+
+    expect(collapsed).toHaveLength(1);
+  });
+
+  it('leaves ambiguous pairs alone rather than merging them wrongly', () => {
+    // Measured overlap for these real pairs was 0.33 to 0.50, the same range
+    // genuinely different decisions reach. Merging loses information silently;
+    // a duplicate is merely visible. Disjoint chunks are what prevents these.
+    const collapsed = collapseNearDuplicates([
+      dec('Config errors?', 'Report validation error explicitly with field and reason'),
+      dec('Config errors?', 'Emit a warning showing the exact validation error instead of silently defaulting'),
+    ]);
+
+    expect(collapsed).toHaveLength(2);
+  });
+
+  it('never merges two decisions that differ only in their subject', () => {
+    const collapsed = collapseNearDuplicates([
+      dec('Which cache should we use?', 'Redis'),
+      dec('Which queue should we use?', 'Redis'),
+    ]);
+
+    expect(collapsed).toHaveLength(2);
+  });
+
+  it('keeps genuinely different decisions apart', () => {
+    const collapsed = collapseNearDuplicates([
+      dec('Which cache?', 'Redis'),
+      dec('Which queue?', 'Horizon workers'),
+      dec('Should cancellation be async?', 'Asynchronous processing'),
+    ]);
+
+    expect(collapsed).toHaveLength(3);
+  });
+
+  it('keeps the richer record when collapsing', () => {
+    const collapsed = collapseNearDuplicates([
+      dec('Invalid config behaviour?', 'Report exact validation error instead of silently defaulting'),
+      dec('Invalid config handling?', 'Report the exact validation error rather than silently defaulting', 2),
+    ]);
+
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0]?.type === 'decision' && collapsed[0].alternatives).toHaveLength(2);
+  });
+
+  it('never collapses records of different types', () => {
+    const decision = dec('Which cache?', 'Redis');
+    const discovery = {
+      ...decision,
+      id: 'disc-1',
+      type: 'discovery' as const,
+      text: 'Which cache Redis',
+    } as unknown as import('@backstory/core').MemoryRecord;
+
+    expect(collapseNearDuplicates([decision, discovery])).toHaveLength(2);
+  });
+
+  it('never collapses across sessions', () => {
+    const a = dec('Invalid config behaviour?', 'Report exact validation error');
+    const b = { ...dec('Invalid config behaviour?', 'Report exact validation error'), sessionId: 'ses-2' };
+
+    expect(collapseNearDuplicates([a, b])).toHaveLength(2);
+  });
+
+  it('handles an empty list', () => {
+    expect(collapseNearDuplicates([])).toEqual([]);
+  });
+});
+
+describe('identity across re-distillation', () => {
+  function decisionAt(from: number, to: number) {
+    return withDerivedId({
+      type: 'decision' as const,
+      sessionId: 'ses-1',
+      episodeId: null,
+      createdAt: '2026-08-25T09:00:00Z',
+      source: {
+        adapter: 'claude-code',
+        sessionId: 'ses-1',
+        sessionFile: '/tmp/a.jsonl',
+        fromOffset: from,
+        toOffset: to,
+      },
+      question: 'Which cache should we use?',
+      choice: 'Redis',
+      reason: 'Already deployed.',
+      alternatives: [],
+      attribution: {
+        proposedBy: { type: 'agent' as const, id: 'agent:x' },
+        acceptedBy: 'implicit' as const,
+      },
+      status: 'accepted' as const,
+      supersededBy: null,
+      relationships: [],
+    });
+  }
+
+  it('gives the same id when chunk boundaries shift between runs', () => {
+    // Dogfooding read one session at 877 events and again at 899. The chunking
+    // differed, the regions differed, and a second full set of records appeared.
+    expect(decisionAt(0, 120).id).toBe(decisionAt(60, 180).id);
+  });
+
+  it('ignores punctuation and casing differences in the subject', () => {
+    const plain = decisionAt(0, 10);
+    const restyled = withDerivedId({ ...plain, choice: 'redis!' });
+
+    expect(restyled.id).toBe(plain.id);
+  });
+});
+
+describe('chunk boundaries', () => {
+  it('produces disjoint chunks by default so a decision cannot appear twice', () => {
+    const events = Array.from({ length: 400 }, (_, i) => eventAt(i, `turn ${i}`));
+    const chunks = chunkEvents(events, { chunkSize: 100 });
+
+    const seen = new Set<number>();
+    for (const chunk of chunks) {
+      for (const event of chunk.events) {
+        expect(seen.has(event.source.offset)).toBe(false);
+        seen.add(event.source.offset);
+      }
+    }
+
+    expect(seen.size).toBe(400);
   });
 });

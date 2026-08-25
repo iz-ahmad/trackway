@@ -12,3 +12,4 @@ export * from './eval/score.js';
 export * from './eval/run.js';
 export * from './eval/judge.js';
 export * from './chunk.js';
+export * from './dedupe.js';
