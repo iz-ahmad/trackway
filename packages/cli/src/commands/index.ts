@@ -140,7 +140,7 @@ export async function syncCommand(
   }
 
   for (const failure of result.sweep.failures) {
-    io.err(`  failed: ${failure.sessionId.slice(0, 12)} — ${truncate(failure.reason, 90)}`);
+    io.err(`  failed: ${failure.sessionId.slice(0, 12)}: ${truncate(failure.reason, 90)}`);
   }
 
   return 0;
@@ -168,7 +168,7 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
       ? status.canDistill
         ? 'ready'
         : 'ingest only'
-      : `unavailable — ${status.reason ?? 'unknown'}`;
+      : `unavailable: ${status.reason ?? 'unknown'}`;
     io.out(`  ${status.id.padEnd(12)} ${state}`);
   }
 
@@ -467,7 +467,7 @@ export async function rebuildCommand(_options: unknown, io: Io = consoleIo): Pro
     io.out(`Rebuilt the index from ${result.indexed} record file(s).`);
 
     for (const failure of result.failures) {
-      io.err(`  unreadable: ${failure.path} — ${failure.reason}`);
+      io.err(`  unreadable: ${failure.path}: ${failure.reason}`);
     }
     return 0;
   } finally {

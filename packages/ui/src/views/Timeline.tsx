@@ -53,7 +53,7 @@ export function Timeline(): JSX.Element {
       >
         {sessions.map((session) => (
           <option key={session.sessionId} value={session.sessionId}>
-            {session.lastAt.slice(0, 10)} — {session.sessionId.slice(0, 12)} ({session.recordCount})
+            {session.lastAt.slice(0, 10)} · {session.sessionId.slice(0, 12)} ({session.recordCount})
           </option>
         ))}
       </select>
@@ -85,7 +85,7 @@ function TimelineEntry({ entry }: { entry: Entry }): JSX.Element {
           <div className="muted">{record.reason}</div>
           {record.alternatives.map((alternative) => (
             <div className="alt" key={alternative.choice}>
-              <span className="choice">{alternative.choice}</span> — {alternative.reason}
+              <span className="choice">{alternative.choice}</span>: {alternative.reason}
               {alternative.condition ? (
                 <div className="cond">held because: {alternative.condition}</div>
               ) : null}

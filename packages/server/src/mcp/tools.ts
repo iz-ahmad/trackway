@@ -151,7 +151,7 @@ export function memoryRejected(context: ToolContext, topic: string, limit = 20):
     '',
     ...alternatives.map((alternative) =>
       [
-        `${alternative.choice} — ${alternative.status} on ${alternative.createdAt.slice(0, 10)}`,
+        `${alternative.choice}: ${alternative.status} on ${alternative.createdAt.slice(0, 10)}`,
         `  Reason: ${alternative.reason}`,
         alternative.condition ? `  True at the time: ${alternative.condition}` : '',
         `  Chosen instead: ${alternative.decisionChoice} [${alternative.decisionId}]`,
