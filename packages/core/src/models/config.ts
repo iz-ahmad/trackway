@@ -1,0 +1,29 @@
+import { z } from 'zod';
+
+export const DEFAULT_STORE_DIR = '.backstory';
+export const DEFAULT_QUIET_WINDOW_MINUTES = 15;
+export const DEFAULT_CACHE_RETENTION_DAYS = 30;
+
+export const BackstoryConfig = z.strictObject({
+  /** Repo-relative directory holding records. Tracked by git. */
+  storePath: z.string().min(1).default(DEFAULT_STORE_DIR),
+
+  /**
+   * A session file untouched for this long is eligible for distillation.
+   * A file still being written is never touched, so an active session never
+   * contends with the developer's own agent.
+   */
+  quietWindowMinutes: z.number().int().positive().default(DEFAULT_QUIET_WINDOW_MINUTES),
+
+  /** Raw parsed events are purged from the local cache after this many days. */
+  cacheRetentionDays: z.number().int().positive().default(DEFAULT_CACHE_RETENTION_DAYS),
+
+  /** Adapter ids to run. An adapter reporting unavailable is skipped, not an error. */
+  adapters: z.array(z.string().min(1)).default(['claude-code', 'codex', 'opencode']),
+});
+
+export type BackstoryConfig = z.infer<typeof BackstoryConfig>;
+
+export function defaultConfig(): BackstoryConfig {
+  return BackstoryConfig.parse({});
+}
