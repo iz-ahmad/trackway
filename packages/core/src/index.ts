@@ -2,3 +2,6 @@ export * from './models/actor.js';
 export * from './models/event.js';
 export * from './models/record.js';
 export * from './models/config.js';
+export * from './ids/derive.js';
+export * from './store/serialize.js';
+export * from './store/store.js';
