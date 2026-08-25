@@ -6,6 +6,7 @@ import {
   forgetCommand,
   graphCommandEntry,
   initCommand,
+  mcpCommand,
   rebuildCommand,
   rejectedCommand,
   searchCommand,
@@ -99,6 +100,13 @@ async function main(): Promise<void> {
     .option('-p, --port <n>', 'port to listen on', Number)
     .option('--no-open', 'do not launch a browser')
     .action(async (options) => process.exit(await graphCommandEntry(options, consoleIo)));
+
+  program
+    .command('mcp')
+    .description('serve memory to a coding agent over stdio (read-only)')
+    .action(async (options) => {
+      await mcpCommand(options, consoleIo);
+    });
 
   program
     .command('rebuild')

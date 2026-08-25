@@ -431,6 +431,24 @@ export async function graphCommandEntry(
   return graphCommand(workspace, options, io);
 }
 
+/**
+ * Serves memory to a coding agent over stdio.
+ *
+ * Read-only. Nothing here can write a record, so distillation stays the single
+ * write path.
+ */
+export async function mcpCommand(_options: unknown, io: Io = consoleIo): Promise<number> {
+  const workspace = await requireWorkspace(io);
+  if (!workspace) return 1;
+
+  const { serveMcpOverStdio } = await import('@backstory/server');
+  const db = openWorkspaceIndex(workspace);
+
+  // stdout carries the protocol, so nothing else may be written to it.
+  await serveMcpOverStdio(db);
+  return 0;
+}
+
 export async function rebuildCommand(_options: unknown, io: Io = consoleIo): Promise<number> {
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
