@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import {
   consoleIo,
   decisionsCommand,
+  evalCommandEntry,
   forgetCommand,
   graphCommandEntry,
   initCommand,
@@ -107,6 +108,13 @@ async function main(): Promise<void> {
     .action(async (options) => {
       await mcpCommand(options, consoleIo);
     });
+
+  program
+    .command('eval')
+    .description('measure extraction quality against sessions that carry their own answer key')
+    .option('-n, --limit <n>', 'how many sessions to score', Number)
+    .option('--json', 'machine-readable output')
+    .action(async (options) => process.exit(await evalCommandEntry(options, consoleIo)));
 
   program
     .command('rebuild')

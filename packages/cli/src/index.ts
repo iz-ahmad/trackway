@@ -4,3 +4,4 @@ export * from './pipeline.js';
 export * from './format.js';
 export * from './commands/index.js';
 export * from './commands/graph.js';
+export * from './commands/eval.js';

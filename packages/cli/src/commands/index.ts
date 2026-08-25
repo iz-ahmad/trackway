@@ -449,6 +449,14 @@ export async function mcpCommand(_options: unknown, io: Io = consoleIo): Promise
   return 0;
 }
 
+export async function evalCommandEntry(
+  options: { limit?: number; json?: boolean },
+  io: Io = consoleIo,
+): Promise<number> {
+  const { evalCommand } = await import('./eval.js');
+  return evalCommand(options, io);
+}
+
 export async function rebuildCommand(_options: unknown, io: Io = consoleIo): Promise<number> {
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;

@@ -4,7 +4,7 @@ The history behind your code.
 
 Backstory reads the session files your coding agent already writes to disk. It turns them into a searchable, version-controlled record of the questions you asked, the things you discovered, the decisions you made, and the options you rejected.
 
-> **Status:** in development. Nothing here works yet. The design is settled and the implementation plan is written. See [Roadmap](#roadmap).
+> **Status:** working, not yet released. The full path runs end to end: it reads real sessions, distils them, writes records, indexes them, and serves search, an explorer, and MCP retrieval. Extraction quality is measured but not yet good enough to call finished. See [How well does it work](#how-well-does-it-work).
 
 ## The problem
 
@@ -99,11 +99,15 @@ Credential redaction is best effort. A secret shaped like ordinary prose will ge
 
 ## Supported agents
 
-| Agent | Read via | Ingest | Distill |
+| Agent | Read via | Ingest | Distil |
 | --- | --- | --- | --- |
-| Claude Code | session files | yes | yes |
-| OpenCode | its own CLI, with built-in redaction | yes | yes |
-| Codex | session files | yes | not yet |
+| Claude Code | session files in `~/.claude/projects/` | yes | yes |
+| Codex | rollout files in `~/.codex/sessions/` | yes | not yet |
+| OpenCode | its local SQLite database, read-only | yes | yes |
+
+Codex ingests but does not distil. Its CLI was not installed on the machine this was built against, so its non-interactive mode could not be verified, and claiming an unverified capability would fail mid-sweep. `backstory status` reports this rather than failing.
+
+OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
 
 Adding an agent means writing a parser behind one interface. Nothing in the core changes. Agents without a local session store can pipe a transcript into `backstory ingest`.
 
@@ -112,6 +116,20 @@ Adding an agent means writing a parser behind one interface. Nothing in the core
 Backstory ships a read-only MCP server so your coding agent can consult prior decisions before proposing changes. Results come back as dated evidence with attribution and source, not as commands. The agent decides what to do with them.
 
 The server exposes no write tool. Records are created by distillation only.
+
+## How well does it work
+
+Extraction quality is measured against an answer key the sessions provide themselves. When an agent presents an explicit list of options, that list is stored as structured data: the question, every option, and its rationale. 44 of 110 real sessions carry one, giving 178 known decision points with no hand labelling.
+
+Measured on a six-session sample: **precision 0.58, recall 0.13**.
+
+Precision is usable. Recall is not, and it is the honest number to show. The extractor is deliberately conservative, and a first attempt made it worse by capping each session at 200 events, so long sessions were silently cut off. That is fixed by chunking, and the next pass measures whether it helped. Nothing gates a release on these numbers, by design: suppressing a useful record to protect a score is the wrong trade.
+
+Run it yourself:
+
+```bash
+backstory eval
+```
 
 ## Roadmap
 
@@ -126,9 +144,20 @@ Deliberately not in version 1:
 - Team trust controls
 - Automatic linking of decisions to the commits that implemented them
 
+## Development
+
+```bash
+npm install
+npm run build      # compiles packages and builds the explorer
+npm test           # 352 tests
+npm run typecheck  # strict mode, sources and tests
+```
+
+The workspace is six packages. `core` holds the record model, the store, and search, and depends on nothing internal. `adapters` reads sessions. `distill` runs the sweep and the extractor. `server` serves the explorer API and MCP. `ui` is the explorer. `cli` wires them together.
+
 ## Contributing
 
-Not yet accepting contributions. The core needs to work first.
+Not yet accepting contributions. Recall needs to improve first.
 
 ## License
 
