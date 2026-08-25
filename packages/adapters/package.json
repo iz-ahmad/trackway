@@ -5,9 +5,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": "./dist/index.js" },
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "dependencies": {
     "@backstory/core": "*",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "better-sqlite3": "^11.0.0"
   }
 }

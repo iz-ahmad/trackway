@@ -4,3 +4,6 @@ export * from './redact/index.js';
 export * from './claude-code/format.js';
 export * from './claude-code/parse.js';
 export * from './claude-code/adapter.js';
+export * from './codex/adapter.js';
+export * from './opencode/adapter.js';
+export * from './defaults.js';
