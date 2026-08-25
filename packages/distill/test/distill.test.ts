@@ -512,7 +512,32 @@ describe('chunking a long session', () => {
     ).rejects.toThrow(RunnerError);
   });
 
-  it('reports when a session is capped rather than capping silently', async () => {
+  it('widens chunks on a very long session rather than dropping its tail', async () => {
+    const seen: number[] = [];
+    const runner: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: true };
+      },
+      async run(prompt) {
+        seen.push((prompt.match(/turn \d+/g) ?? []).length);
+        return JSON.stringify({});
+      },
+    };
+
+    await createDistiller({ runner, chunkSize: 20, maxChunks: 3 })({
+      descriptor,
+      events: eventsN(400),
+      fromOffset: -1,
+    });
+
+    // Three calls that between them still see the whole session, rather than
+    // three calls covering the first 60 events and silently losing 340.
+    expect(seen.length).toBeLessThanOrEqual(4);
+    expect(seen.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(400);
+  });
+
+  it('reports when it widens rather than doing it silently', async () => {
     const messages: string[] = [];
     const runner: DistillRunner = {
       id: 'stub',
@@ -531,7 +556,18 @@ describe('chunking a long session', () => {
       onProgress: (m) => messages.push(m),
     })({ descriptor, events: eventsN(400), fromOffset: -1 });
 
-    expect(messages.join(' ')).toContain('cap reached');
+    expect(messages.join(' ')).toContain('widening chunks');
+  });
+
+  it('covers every event of a long session across its chunks', () => {
+    const events = eventsN(2100);
+    const chunkSize = Math.max(120, Math.ceil(events.length / 12));
+    const chunks = chunkEvents(events, { chunkSize });
+
+    const covered = new Set(chunks.flatMap((c) => c.events.map((e) => e.source.offset)));
+
+    expect(chunks.length).toBeLessThanOrEqual(13);
+    expect(covered.size).toBe(2100);
   });
 
   it('tells the model when it is seeing one part of a larger session', () => {

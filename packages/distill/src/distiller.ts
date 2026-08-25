@@ -1,5 +1,5 @@
 import type { MemoryRecord } from '@backstory/core';
-import { chunkEvents } from './chunk.js';
+import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
 import { buildPrompt } from './prompts/extract.js';
 import type { DistillRunner } from './runner/contract.js';
 import { toRecords } from './runner/validate.js';
@@ -34,19 +34,20 @@ export function createDistiller(options: DistillerOptions): Distiller {
   return async ({ descriptor, events, fromOffset }): Promise<MemoryRecord[] | null> => {
     if (events.length === 0) return null;
 
-    const chunks = chunkEvents(
-      events,
-      options.chunkSize === undefined ? {} : { chunkSize: options.chunkSize },
-    );
-
     const cap = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
-    const batch = chunks.slice(0, cap);
 
-    if (batch.length < chunks.length) {
-      // Never silent. A capped session is a session whose later half was not
-      // read, and the caller has to be able to know that.
+    // A very long session widens its chunks rather than losing its tail.
+    // Capping the number of chunks alone still drops the end of a session, and
+    // dropping the end is exactly the failure this replaced: a 2100-event
+    // session would have been read only to the two-thirds mark.
+    const requested = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
+    const chunkSize = Math.max(requested, Math.ceil(events.length / cap));
+
+    const batch = chunkEvents(events, { chunkSize });
+
+    if (chunkSize > requested) {
       options.onProgress?.(
-        `session ${descriptor.sessionId}: distilling ${batch.length} of ${chunks.length} chunks (cap reached)`,
+        `session ${descriptor.sessionId}: ${events.length} events, widening chunks to ${chunkSize} to cover it in ${batch.length} calls`,
       );
     }
 
