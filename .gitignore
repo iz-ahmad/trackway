@@ -13,6 +13,9 @@ engineering-memory-v1-spec.md
 node_modules/
 dist/
 build/
+
+# The explorer bundle is built at publish time, not committed.
+!packages/ui/dist/
 *.tsbuildinfo
 coverage/
 

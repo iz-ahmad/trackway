@@ -11,6 +11,9 @@
       "path": "./packages/distill"
     },
     {
+      "path": "./packages/server"
+    },
+    {
       "path": "./packages/cli"
     }
   ]

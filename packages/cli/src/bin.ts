@@ -4,6 +4,7 @@ import {
   consoleIo,
   decisionsCommand,
   forgetCommand,
+  graphCommandEntry,
   initCommand,
   rebuildCommand,
   rejectedCommand,
@@ -91,6 +92,13 @@ async function main(): Promise<void> {
     .description('remove a record, or every record from a session')
     .option('-s, --session', 'treat the target as a session id')
     .action(async (target, options) => process.exit(await forgetCommand(target, options, consoleIo)));
+
+  program
+    .command('graph')
+    .description('open the local explorer: timeline, decision map, project history')
+    .option('-p, --port <n>', 'port to listen on', Number)
+    .option('--no-open', 'do not launch a browser')
+    .action(async (options) => process.exit(await graphCommandEntry(options, consoleIo)));
 
   program
     .command('rebuild')

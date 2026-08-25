@@ -420,6 +420,17 @@ export async function forgetCommand(
   }
 }
 
+export async function graphCommandEntry(
+  options: { port?: number; open?: boolean },
+  io: Io = consoleIo,
+): Promise<number> {
+  const workspace = await requireWorkspace(io);
+  if (!workspace) return 1;
+
+  const { graphCommand } = await import('./graph.js');
+  return graphCommand(workspace, options, io);
+}
+
 export async function rebuildCommand(_options: unknown, io: Io = consoleIo): Promise<number> {
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
