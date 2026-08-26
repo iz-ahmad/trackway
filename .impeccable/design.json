@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T00:00:00.000Z",
+  "title": "Design System: Backstory",
+  "extensions": {
+    "colorMeta": {
+      "fringe-mint": {
+        "role": "primary",
+        "displayName": "Fringe Mint",
+        "canonical": "#3f9a7c",
+        "tonalRamp": [
+          "#3f9a7c",
+          "#63d0ac"
+        ]
+      },
+      "fringe-rose": {
+        "role": "secondary",
+        "displayName": "Fringe Rose",
+        "canonical": "#c25f7c",
+        "tonalRamp": [
+          "#c25f7c",
+          "#ef92b0"
+        ]
+      },
+      "fringe-violet": {
+        "role": "tertiary",
+        "displayName": "Fringe Violet",
+        "canonical": "#7a5cb8",
+        "tonalRamp": [
+          "#7a5cb8",
+          "#ab91e8"
+        ]
+      },
+      "fringe-dispersed": {
+        "role": "tertiary",
+        "displayName": "Fringe Dispersed",
+        "canonical": "#9aa0a7",
+        "tonalRamp": [
+          "#9aa0a7",
+          "#6e757e"
+        ]
+      },
+      "cloud-white": {
+        "role": "neutral",
+        "displayName": "Cloud White",
+        "canonical": "#fcfcfa",
+        "tonalRamp": [
+          "#fcfcfa",
+          "#f5f5f2",
+          "#e6e6e1",
+          "#d6d6d0"
+        ]
+      },
+      "slate-ink": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "canonical": "#22262c",
+        "tonalRamp": [
+          "#22262c",
+          "#565c64",
+          "#6a7179"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The chosen option on the Decisions stage. One per screen."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The Overview's opening sentence, capped at 36ch."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "A record's question and topic headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Option labels and reasoning, 60 to 68ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase section titles, and mono for dates, counts and ids."
+      }
+    },
+    "darkTheme": {
+      "trigger": "prefers-color-scheme: dark guarded as :root:not([data-theme='light']), plus :root[data-theme='dark']",
+      "note": "Dusk, not an inversion. The same phenomenon on a dark sky; the fringe reads brighter and every hue is raised.",
+      "colors": {
+        "cloud-white": "#14161a",
+        "cloud-sunk": "#191c21",
+        "slate-ink": "#e6e9ec",
+        "slate-ink-secondary": "#adb4bc",
+        "slate-ink-tertiary": "#939aa2",
+        "hairline": "#262a31",
+        "hairline-strong": "#343a42",
+        "fringe-mint": "#63d0ac",
+        "fringe-rose": "#ef92b0",
+        "fringe-violet": "#ab91e8",
+        "fringe-dispersed": "#6e757e"
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.22, 0.8, 0.28, 1)",
+        "purpose": "The only easing in the system. Exponential settle from an already-visible default."
+      },
+      {
+        "name": "disperse",
+        "value": "opacity 0.32s, filter 0.32s",
+        "purpose": "The one authored moment: records outside the chosen bands desaturate and dim in place."
+      },
+      {
+        "name": "state",
+        "value": "0.18s to 0.25s",
+        "purpose": "Hover and selection on bands, tabs, rows and list items."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1080px"
+      },
+      {
+        "name": "narrow",
+        "value": "720px"
+      }
+    ],
+    "fonts": {
+      "hosting": "self-hosted in public/fonts",
+      "files": "Commissioner variable 200-600 and IBM Plex Mono 400/500, latin and latin-ext, 102 KB total",
+      "why": "PRODUCT.md promises the explorer opens with no network, so no font may come from a CDN."
+    }
+  },
+  "components": [
+    {
+      "name": "Record Fringe",
+      "kind": "custom",
+      "refersTo": "band",
+      "description": "The signature element. A single 2px spectral band at the edge of a record's text column, fading out before the record ends.",
+      "html": "<article class=\"ds-record\" style=\"--tone:#3f9a7c\"><div class=\"ds-record-text\"><h3>How much of the visual explorer should V1 ship?</h3></div></article>",
+      "css": ".ds-record-text { position: relative; padding: 26px 0 40px 30px; } .ds-record-text::before { content: ''; position: absolute; left: 0; top: 26px; bottom: 26px; width: 2px; border-radius: 2px; opacity: .82; background: linear-gradient(180deg, var(--tone) 0%, var(--tone) 14%, color-mix(in srgb, var(--tone) 40%, transparent) 44%, transparent 82%); transition: opacity .25s cubic-bezier(.22,.8,.28,1); } .ds-record:hover .ds-record-text::before { opacity: 1; }"
+    },
+    {
+      "name": "Kind checkbox",
+      "kind": "custom",
+      "refersTo": "band",
+      "description": "A significance filter. A 16px box that fills with the kind’s own colour when ticked, a label, and a right-aligned mono count. 44px tall.",
+      "html": "<button class=\"ds-ck\" role=\"checkbox\" aria-checked=\"true\" style=\"--tone:#3f9a7c\"><span class=\"box\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 8.5L6.25 12l7-8\"/></svg></span>technical<span class=\"n\">13</span></button>",
+      "css": ".ds-ck { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding-block: 12px; font: 400 14.5px Commissioner, sans-serif; color: #565c64; background: none; border: 0; cursor: pointer; } .ds-ck .box { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid #d6d6d0; border-radius: 2px; color: transparent; } .ds-ck[aria-checked=true] { color: #22262c; } .ds-ck[aria-checked=true] .box { background: var(--tone); border-color: var(--tone); color: #fff; } .ds-ck .n { margin-left: auto; font-family: \"IBM Plex Mono\", monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: #6a7179; }"
+    },
+    {
+      "name": "Fork Option",
+      "kind": "custom",
+      "refersTo": "option-taken",
+      "description": "One branch of a decision. The taken option carries a drawn check in the record's fringe colour; the rest carry a drawn cross in tertiary ink.",
+      "html": "<div class=\"ds-opt ds-taken\"><span class=\"mark\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2.75 8.5L6.25 12l7-8\"/></svg></span><div><div class=\"label\">Keep fully passive</div><div class=\"reason\">Auto-write records, no human gate.</div></div></div>",
+      "css": ".ds-opt { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 12px; padding: 9px 0; } .ds-opt .mark { margin-top: 4px; color: #6f767e; } .ds-opt.ds-taken .mark { color: var(--tone); } .ds-opt .label { font: 400 16px/1.45 Commissioner, sans-serif; color: #565c64; } .ds-opt.ds-taken .label { font-weight: 500; color: #22262c; } .ds-opt .reason { margin-top: 2px; font: 400 14.5px/1.6 Commissioner, sans-serif; color: #565c64; }"
+    },
+    {
+      "name": "Spectrum Bar",
+      "kind": "custom",
+      "refersTo": "band",
+      "description": "A proportion, drawn as a diffracting band. The filled part disperses at its end rather than stopping flat. Not a progress bar.",
+      "html": "<div class=\"ds-spectrum\" style=\"--tone:#7a5cb8\"><i style=\"width:75%\"></i></div>",
+      "css": ".ds-spectrum { height: 2px; border-radius: 2px; background: #d6d6d0; overflow: hidden; display: flex; } .ds-spectrum i { display: block; height: 100%; background: linear-gradient(90deg, var(--tone), color-mix(in srgb, var(--tone) 34%, transparent)); }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "field-search",
+      "description": "A bottom hairline and nothing else. Focus deepens the rule.",
+      "html": "<div class=\"ds-omni\"><input type=\"search\" placeholder=\"Why did we…?\"></div>",
+      "css": ".ds-omni { display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #d6d6d0; padding-block: 5px; min-width: 244px; transition: border-color .2s cubic-bezier(.22,.8,.28,1); } .ds-omni:focus-within { border-bottom-color: #565c64; } .ds-omni input { flex: 1; font: 400 14.5px Commissioner, sans-serif; color: #22262c; background: none; border: 0; padding: 0; } .ds-omni input:focus { outline: none; } .ds-omni input::-webkit-search-cancel-button { appearance: none; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Iridescent Cloud Edge",
+    "overview": "A newly formed cloud stays plain white. Only at its boundary, where sunlight diffracts through droplets that happen to match in size, does it grow a narrow fringe of mint, rose and violet. That is the whole system: the reading surface is achromatic and colour is confined to a hairline at the edge of each record, carrying one fact and no more. The system runs on subtraction. There is no card, no chip, no badge, no pill and no coloured label anywhere in the interface. A record is a column of type in a wide white margin, and the things that would normally be chrome sit in a right-aligned margin column beside the heading rather than stacked above it.",
+    "keyCharacteristics": [
+      "Colour appears only at edges, never in a text field",
+      "Hierarchy from scale and weight, never from hue",
+      "No enclosing containers of any kind",
+      "Wide margins and a 60 to 68ch measure",
+      "Monospace strictly for measured values"
+    ],
+    "rules": [
+      {
+        "name": "The Achromatic Field Rule",
+        "body": "No text is ever coloured by its category. The four significance kinds are told apart by a 2px fringe at the record's edge and by a word in the margin.",
+        "section": "colors"
+      },
+      {
+        "name": "The Removal Rule",
+        "body": "Unticking a kind removes those records. Dimming them in place read as a rendering fault rather than a filter; the counts beside every control carry what was excluded instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured-Value Rule",
+        "body": "Monospace appears only where a value is measured: a date, a count, a record id, a file path. Never to make prose look technical.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Eyebrow Rule",
+        "body": "Nothing is stacked above a heading. Kind, attribution and date live in a right-aligned margin column, or fold beneath the text below 720px.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Boundary Rule",
+        "body": "An element declares itself with a hairline rule or with a fringe, never with both plus a shadow. There are no bordered, shadowed surfaces in this system.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put every category signal in the 2px fringe and the margin word",
+      "Do keep running text between 60 and 68ch, and headings under 68ch",
+      "Do draw icons as SVG at stroke-width 1.5 with round caps and joins on a 16 viewbox",
+      "Do reserve IBM Plex Mono for dates, counts, ids and paths, with tabular-nums",
+      "Do define every colour on bare :root and redefine only tokens under both dark triggers",
+      "Do remove filtered-out records and report what they held in the counts",
+      "Do give every interactive element the same 2px focus ring at 3px offset, inputs included",
+      "Do keep every interactive target at 44px or taller"
+    ],
+    "donts": [
+      "Don't introduce a card, chip, badge, pill or tinted row",
+      "Don't let a fringe run the full height of its record; it fades out by 82% or it is a rail",
+      "Don't colour any text by its category, including headings and counts",
+      "Don't add a shadow; depth here is a blurred colour bleed and a hairline",
+      "Don't stack a kicker, eyebrow or label above a heading",
+      "Don't use monospace for prose, or a unicode glyph where an icon belongs",
+      "Don't use a radius above 2px anywhere",
+      "Don’t load a typeface, script or stylesheet from another host",
+      "Don’t give a view its own page shape; the rail and the reading column are the only structure"
+    ]
+  }
+}
