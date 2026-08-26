@@ -48,6 +48,7 @@ const fakeDistiller: Distiller = async ({ descriptor, events, fromOffset }) => {
       type: 'decision',
       sessionId: descriptor.sessionId,
       episodeId: null,
+      significance: 'technical',
       createdAt: '2026-08-25T09:18:00Z',
       source,
       question: 'Which cache should we use?',

@@ -13,6 +13,7 @@ const decision: MemoryRecord = {
   type: 'decision',
   sessionId: 'ses-1',
   episodeId: null,
+  significance: 'technical',
   createdAt: '2026-08-25T09:18:00Z',
   source: {
     adapter: 'claude-code',
@@ -46,6 +47,7 @@ const discovery: MemoryRecord = {
   type: 'discovery',
   sessionId: 'ses-1',
   episodeId: null,
+  significance: 'technical',
   createdAt: '2026-08-25T09:10:00Z',
   source: {
     adapter: 'claude-code',
@@ -112,6 +114,41 @@ describe('the data API', () => {
     });
   });
 
+  it('reports how many records are worth reading, not just how many exist', async () => {
+    const body = await json<{ counts: Record<string, number>; byKind: Record<string, number> }>(
+      '/api/overview',
+    );
+
+    // A count of everything tells a reader nothing about what to open.
+    expect(body.counts['foreground']).toBeLessThanOrEqual(body.counts['records'] ?? 0);
+    expect(Object.keys(body.byKind).sort()).toEqual([
+      'business',
+      'direction',
+      'technical',
+      'working',
+    ]);
+  });
+
+  it('puts project-level decisions first so the map opens on something that mattered', async () => {
+    const body = await json<{ records: MemoryRecord[] }>('/api/decisions');
+
+    expect(body.records.length).toBeGreaterThan(0);
+  });
+
+  it('serves every record for the story view, oldest first', async () => {
+    const body = await json<{ records: MemoryRecord[] }>('/api/records');
+    const dates = body.records.map((record) => record.createdAt);
+
+    expect(body.records).toHaveLength(2);
+    expect([...dates].sort()).toEqual(dates);
+  });
+
+  it('scopes records to one session when asked', async () => {
+    const body = await json<{ records: MemoryRecord[] }>('/api/records?session=nope');
+
+    expect(body.records).toEqual([]);
+  });
+
   it('searches discarded options directly', async () => {
     const body = await json<{ alternatives: Array<{ choice: string }> }>('/api/rejected?q=unlogged');
 
@@ -119,9 +156,11 @@ describe('the data API', () => {
   });
 
   it('summarises the project in one request', async () => {
-    const body = await json<{ counts: Record<string, number> }>('/api/overview');
+    const body = await json<{ counts: Record<string, number>; byKind: Record<string, number> }>(
+      '/api/overview',
+    );
 
-    expect(body.counts).toEqual({ sessions: 1, records: 2, decisions: 1, rejected: 1 });
+    expect(body.counts).toMatchObject({ sessions: 1, records: 2, decisions: 1, rejected: 1 });
   });
 
   it('exposes no endpoint that returns raw events', async () => {

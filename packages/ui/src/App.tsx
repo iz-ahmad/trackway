@@ -1,37 +1,117 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
+import { api } from './api.js';
+import { Search as SearchIcon } from './icons.js';
 import { DecisionMap } from './views/DecisionMap.js';
 import { History } from './views/History.js';
 import { Search } from './views/Search.js';
 import { Timeline } from './views/Timeline.js';
+import type { SessionSummary } from './types.js';
 
-type View = 'timeline' | 'map' | 'history' | 'search';
+type View = 'story' | 'map' | 'overview';
 
-export function App(): JSX.Element {
-  // Timeline is the default. The spec calls it the view that must be easy to
-  // scan, and the map is the secondary lens rather than the entry point.
-  const [view, setView] = useState<View>('timeline');
+export function App(): ReactElement {
+  const [view, setView] = useState<View>('story');
+  const [query, setQuery] = useState('');
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [focusDecision, setFocusDecision] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.sessions().then((data) => setSessions(data.sessions)).catch(() => setSessions([]));
+  }, []);
+
+  // Typing in the search box is its own view. It replaces whatever is showing
+  // and returns you where you were, so search never costs you your place.
+  const searching = query.trim().length >= 2;
+
+  const openDecision = (id: string) => {
+    setFocusDecision(id);
+    setQuery('');
+    setView('map');
+  };
+
+  const showRail = !searching && view === 'story' && sessions.length > 1;
 
   return (
-    <>
-      <header>
-        <div className="brand">
+    <div className="shell">
+      <header className="topbar">
+        <div className="wordmark">
           Backstory<span>the history behind your code</span>
         </div>
-        <nav>
-          {(['timeline', 'map', 'history', 'search'] as const).map((name) => (
-            <button key={name} aria-current={view === name} onClick={() => setView(name)}>
-              {name === 'map' ? 'decision map' : name}
+
+        <nav className="tabs">
+          {(
+            [
+              ['story', 'Story'],
+              ['map', 'Decisions'],
+              ['overview', 'Overview'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              aria-current={!searching && view === id}
+              onClick={() => {
+                setQuery('');
+                setView(id);
+              }}
+            >
+              {label}
             </button>
           ))}
         </nav>
+
+        <div className="omni">
+          <SearchIcon />
+          <input
+            type="search"
+            value={query}
+            placeholder="Why did we…?"
+            aria-label="Search the record"
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setQuery('');
+            }}
+          />
+        </div>
       </header>
 
-      <main className={view === 'map' ? 'wide' : undefined}>
-        {view === 'timeline' ? <Timeline /> : null}
-        {view === 'map' ? <DecisionMap /> : null}
-        {view === 'history' ? <History onOpen={() => setView('timeline')} /> : null}
-        {view === 'search' ? <Search /> : null}
-      </main>
-    </>
+      <div className={`body${showRail ? '' : ' solo'}`}>
+        {showRail ? (
+          <aside className="rail">
+            <div className="rail-label">Sessions</div>
+            <button aria-current={sessionId === null} onClick={() => setSessionId(null)}>
+              All sessions
+              <span className="count">{sessions.reduce((n, s) => n + s.recordCount, 0)}</span>
+            </button>
+            {sessions.map((session) => (
+              <button
+                key={session.sessionId}
+                aria-current={sessionId === session.sessionId}
+                onClick={() => setSessionId(session.sessionId)}
+              >
+                {session.lastAt.slice(0, 10)}
+                <span className="count">{session.recordCount}</span>
+              </button>
+            ))}
+          </aside>
+        ) : null}
+
+        {view === 'map' && !searching ? (
+          <DecisionMap focusId={focusDecision} onFocus={setFocusDecision} />
+        ) : (
+          <main className="main">
+            <div className="main-inner">
+              {searching ? (
+                <Search query={query} onOpenDecision={openDecision} />
+              ) : view === 'story' ? (
+                <Timeline sessionId={sessionId} onOpenDecision={openDecision} />
+              ) : (
+                <History onOpenEpisode={() => setView('story')} />
+              )}
+            </div>
+          </main>
+        )}
+      </div>
+    </div>
   );
 }

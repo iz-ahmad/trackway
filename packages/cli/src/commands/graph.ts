@@ -30,6 +30,7 @@ export async function graphCommand(
 
   const explorer = await startExplorer({
     db,
+    storeDir: workspace.storeDir,
     uiDir: resolveUiDir(),
     ...(options.port === undefined ? {} : { port: options.port }),
   });

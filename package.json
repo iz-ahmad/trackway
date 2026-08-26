@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "tsc --build && npm run build --workspace @backstory/ui",
-    "typecheck": "tsc --build --force && tsc -p tsconfig.test.json",
+    "typecheck": "tsc --build --force && tsc -p tsconfig.test.json && tsc -p packages/ui/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },

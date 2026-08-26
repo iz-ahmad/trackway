@@ -7,6 +7,7 @@ import { createApi } from './api.js';
 
 export interface ExplorerOptions {
   db: IndexDatabase;
+  storeDir?: string;
   /** Directory holding the prebuilt explorer. */
   uiDir: string;
   port?: number;
@@ -19,10 +20,10 @@ export interface RunningExplorer {
   close: () => Promise<void>;
 }
 
-export function createExplorerApp(options: Pick<ExplorerOptions, 'db' | 'uiDir'>): Hono {
+export function createExplorerApp(options: Pick<ExplorerOptions, 'db' | 'uiDir' | 'storeDir'>): Hono {
   const app = new Hono();
 
-  app.route('/', createApi({ db: options.db }));
+  app.route('/', createApi({ db: options.db, ...(options.storeDir ? { storeDir: options.storeDir } : {}) }));
 
   if (existsSync(options.uiDir)) {
     app.use('/assets/*', serveStatic({ root: options.uiDir }));

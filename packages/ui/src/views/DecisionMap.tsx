@@ -1,24 +1,31 @@
-import { Background, Controls, ReactFlow, type Edge, type Node } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { api } from '../api.js';
-import { attributionOf, type DecisionRecord, type MemoryRecord } from '../types.js';
+import { Loading, Problem, plural } from './Timeline.js';
+import {
+  KIND_LABEL,
+  attributionOf,
+  isForeground,
+  kindOf,
+  type DecisionRecord,
+  type MemoryRecord,
+} from '../types.js';
 
-/** Above this many decisions the map shows the spine only. */
-const SPINE_THRESHOLD = 25;
-
-const ROW_HEIGHT = 150;
-const BRANCH_X = 320;
+interface Props {
+  focusId: string | null;
+  onFocus: (id: string) => void;
+}
 
 /**
- * One decision, its chosen path, and the options that were dropped.
+ * One fork at a time.
  *
- * Layout is computed rather than simulated, so the same records always draw the
- * same shape. A force layout that rearranges itself between visits makes the
- * map impossible to recognise, which defeats the point of a map.
+ * The first version drew every decision and every branch on one canvas, which
+ * was accurate and unreadable: a wall of small boxes with no entry point and no
+ * way to tell which mattered. A decision map is for understanding one choice,
+ * so the list picks and the stage shows.
  */
-export function DecisionMap(): JSX.Element {
-  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
+export function DecisionMap({ focusId, onFocus }: Props): ReactElement {
+  const [decisions, setDecisions] = useState<DecisionRecord[] | null>(null);
+  const [showWorking, setShowWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,112 +35,114 @@ export function DecisionMap(): JSX.Element {
       .catch((cause: unknown) => setError(String(cause)));
   }, []);
 
-  const spineOnly = decisions.length > SPINE_THRESHOLD;
-  const { nodes, edges } = useMemo(() => buildGraph(decisions, spineOnly), [decisions, spineOnly]);
+  if (error) return <Problem detail={error} />;
+  if (decisions === null) return <Loading />;
 
-  if (error) return <p className="empty">{error}</p>;
-  if (decisions.length === 0) return <p className="empty">No decisions recorded yet.</p>;
+  const shown = decisions.filter((decision) => showWorking || isForeground(decision));
+  const workingCount = decisions.length - decisions.filter(isForeground).length;
+  const focused = shown.find((d) => d.id === focusId) ?? shown[0] ?? null;
+
+  if (decisions.length === 0) {
+    return (
+      <div className="empty">
+        <h3>No decisions recorded yet</h3>
+        <p>Decisions appear here once a session has been distilled.</p>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {spineOnly ? (
-        <p className="muted" style={{ marginBottom: 12 }}>
-          {decisions.length} decisions. Showing the spine only so the map stays readable; open a
-          decision in the timeline to see its alternatives.
+    <div className="map">
+      <aside className="map-list">
+        <div className="rail-label">
+          {shown.length} {plural(shown.length, 'decision')}
+        </div>
+
+        {shown.map((decision) => (
+          <button
+            key={decision.id}
+            className="map-item"
+            aria-current={focused?.id === decision.id}
+            onClick={() => onFocus(decision.id)}
+          >
+            <span className="t">{decision.choice}</span>
+            <span className="s">
+              {decision.alternatives.length > 0
+                ? `${decision.alternatives.length} not taken`
+                : 'no alternatives recorded'}
+              {' · '}
+              {KIND_LABEL[kindOf(decision)]}
+            </span>
+          </button>
+        ))}
+
+        {workingCount > 0 ? (
+          <button className="linkish" onClick={() => setShowWorking(!showWorking)}>
+            {showWorking ? 'Hide' : 'Show'} {workingCount} working
+          </button>
+        ) : null}
+      </aside>
+
+      <div className="map-stage">
+        {focused ? <Fork decision={focused} /> : <p className="empty">Pick a decision.</p>}
+      </div>
+    </div>
+  );
+}
+
+function Fork({ decision }: { decision: DecisionRecord }): ReactElement {
+  return (
+    <div className="map-stage-inner">
+      <p className="fork-question">{decision.question}</p>
+      <h1 className="fork-title">{decision.choice}</h1>
+
+      <div className="record-head" style={{ marginBottom: 18 }}>
+        <span className="tag" data-kind={kindOf(decision)}>
+          {KIND_LABEL[kindOf(decision)]}
+        </span>
+        <span className="who">{attributionOf(decision)}</span>
+        <span className="time">{decision.createdAt.slice(0, 10)}</span>
+      </div>
+
+      <div className="branch taken">
+        <span className="mark">✓</span>
+        <div>
+          <div className="label">{decision.choice}</div>
+          <div className="detail">{decision.reason}</div>
+        </div>
+      </div>
+
+      {decision.alternatives.map((alternative) => (
+        <div className="branch dropped" key={alternative.choice}>
+          <span className="mark">✗</span>
+          <div>
+            <div className="label">{alternative.choice}</div>
+            <div className="detail">{alternative.reason}</div>
+            {alternative.condition ? (
+              <span className="cond">
+                True at the time: {alternative.condition}. If that has changed, this is worth
+                revisiting.
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ))}
+
+      {decision.alternatives.length === 0 ? (
+        <p className="who" style={{ marginTop: 10 }}>
+          No alternatives were recorded for this one.
         </p>
       ) : null}
 
-      <div className="graph">
-        <ReactFlow nodes={nodes} edges={edges} fitView proOptions={{ hideAttribution: true }}>
-          <Background />
-          <Controls />
-        </ReactFlow>
-      </div>
-    </>
+      {decision.status === 'superseded' && decision.supersededBy ? (
+        <p className="who" style={{ marginTop: 16 }}>
+          Later superseded by {decision.supersededBy}.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
 function isDecision(record: MemoryRecord): record is DecisionRecord {
   return record.type === 'decision';
-}
-
-export function buildGraph(
-  decisions: readonly DecisionRecord[],
-  spineOnly: boolean,
-): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
-
-  decisions.forEach((decision, row) => {
-    const y = row * ROW_HEIGHT;
-
-    nodes.push({
-      id: decision.id,
-      position: { x: 0, y },
-      data: {
-        label: (
-          <div className="node taken">
-            <div className="muted" style={{ fontSize: 11 }}>
-              {decision.question}
-            </div>
-            <div>
-              <span className="mark">✓</span>
-              {decision.choice}
-            </div>
-            <div className="muted" style={{ fontSize: 11 }}>
-              {attributionOf(decision)}
-            </div>
-          </div>
-        ),
-      },
-      type: 'default',
-    });
-
-    if (!spineOnly) {
-      decision.alternatives.forEach((alternative, index) => {
-        const id = `${decision.id}:alt${index}`;
-
-        nodes.push({
-          id,
-          position: { x: BRANCH_X, y: y + index * 70 },
-          data: {
-            label: (
-              <div className="node dropped">
-                <div>
-                  <span className="mark">✗</span>
-                  {alternative.choice}
-                </div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  {alternative.reason}
-                </div>
-                {alternative.condition ? (
-                  <div className="muted" style={{ fontSize: 11 }}>
-                    held because: {alternative.condition}
-                  </div>
-                ) : null}
-              </div>
-            ),
-          },
-          type: 'default',
-        });
-
-        edges.push({ id: `e-${id}`, source: decision.id, target: id, animated: false });
-      });
-    }
-
-    if (decision.supersededBy) {
-      edges.push({
-        id: `e-sup-${decision.id}`,
-        source: decision.id,
-        target: decision.supersededBy,
-        label: 'superseded by',
-        style: { strokeDasharray: '4 4' },
-      });
-    }
-  });
-
-  // A supersession edge pointing at a decision outside the current set would
-  // render as a dangling arrow, so those are dropped.
-  const present = new Set(nodes.map((node) => node.id));
-  return { nodes, edges: edges.filter((edge) => present.has(edge.target)) };
 }

@@ -1,9 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { api } from '../api.js';
-import type { Overview } from '../types.js';
+import { Loading, Problem, plural } from './Timeline.js';
+import { KIND_BLURB, KIND_LABEL, type Overview, type Significance } from '../types.js';
 
-/** Where the developer orients: how much is recorded, and across which sessions. */
-export function History({ onOpen }: { onOpen: (sessionId: string) => void }): JSX.Element {
+const KINDS: Significance[] = ['business', 'technical', 'direction', 'working'];
+
+/**
+ * Where a reader orients: what this project's memory actually holds, and which
+ * topics are worth opening.
+ *
+ * The first version showed four totals and a session id, which told a reader
+ * nothing they could act on. Counts only earn their place next to the shape of
+ * what is inside them.
+ */
+export function History({ onOpenEpisode }: { onOpenEpisode: () => void }): ReactElement {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,36 +21,91 @@ export function History({ onOpen }: { onOpen: (sessionId: string) => void }): JS
     api.overview().then(setOverview).catch((cause: unknown) => setError(String(cause)));
   }, []);
 
-  if (error) return <p className="empty">{error}</p>;
-  if (!overview) return <p className="empty">Loading…</p>;
+  if (error) return <Problem detail={error} />;
+  if (!overview) return <Loading />;
+
   if (overview.counts.records === 0) {
-    return <p className="empty">Nothing recorded yet. Run backstory sync.</p>;
+    return (
+      <div className="empty">
+        <h3>Nothing recorded yet</h3>
+        <p>
+          Run <code>backstory sync</code> and this fills with the decisions behind your work.
+        </p>
+      </div>
+    );
   }
+
+  const { counts, byKind, episodes } = overview;
+  const biggest = Math.max(1, ...episodes.map((episode) => episode.count));
 
   return (
     <>
-      <div className="stats">
-        <Stat n={overview.counts.records} label="records" />
-        <Stat n={overview.counts.decisions} label="decisions" />
-        <Stat n={overview.counts.rejected} label="options not taken" />
-        <Stat n={overview.counts.sessions} label="sessions" />
+      <div className="figures">
+        <Figure n={counts.foreground} label="worth reading" />
+        <Figure n={counts.decisions} label={plural(counts.decisions, 'decision')} />
+        <Figure n={counts.rejected} label="options not taken" />
+        <Figure n={counts.records} label="records in total" />
       </div>
 
-      {overview.sessions.map((session) => (
-        <div className="card" key={session.sessionId} onClick={() => onOpen(session.sessionId)}>
-          <div className="title">{session.sessionId.slice(0, 20)}</div>
-          <div className="muted">
-            {session.lastAt.slice(0, 10)} · {session.recordCount} records · {session.adapter}
+      <h2 className="section-title">What the records are</h2>
+      <div style={{ marginBottom: 26 }}>
+        {KINDS.map((kind) => (
+          <div key={kind} className="topic-row" style={{ cursor: 'default' }}>
+            <div>
+              <div className="name" style={{ color: `var(--${kind})` }}>
+                {KIND_LABEL[kind]}
+              </div>
+              <div className="sub">{KIND_BLURB[kind]}</div>
+            </div>
+            <div className="bar" title={`${byKind[kind] ?? 0} records`}>
+              <i
+                style={{
+                  width: `${((byKind[kind] ?? 0) / Math.max(1, counts.records)) * 100}%`,
+                  background: `var(--${kind})`,
+                }}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {episodes.length > 0 ? (
+        <>
+          <h2 className="section-title">Topics worked on</h2>
+          {episodes.map((episode) => (
+            <button className="topic-row" key={episode.id} onClick={onOpenEpisode}>
+              <div>
+                <div className="name">{episode.title}</div>
+                <div className="sub">
+                  {episode.foreground} worth reading of {episode.count}{' '}
+                  {plural(episode.count, 'record')}
+                </div>
+              </div>
+              <div className="bar" title={`${episode.count} records`}>
+                <i
+                  style={{
+                    width: `${(episode.foreground / Math.max(1, episode.count)) * 100}%`,
+                    background: 'var(--accent)',
+                  }}
+                />
+                <i
+                  style={{
+                    width: `${((episode.count - episode.foreground) / Math.max(1, episode.count)) * 100}%`,
+                    background: 'var(--line-strong)',
+                  }}
+                />
+              </div>
+            </button>
+          ))}
+        </>
+      ) : null}
     </>
   );
 }
 
-function Stat({ n, label }: { n: number; label: string }): JSX.Element {
+function Figure({ n, label }: { n: number; label: string }): ReactElement {
   return (
-    <div className="stat">
+    <div className="figure">
       <div className="n">{n}</div>
       <div className="l">{label}</div>
     </div>

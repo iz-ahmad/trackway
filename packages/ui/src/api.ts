@@ -9,9 +9,9 @@ async function get<T>(path: string): Promise<T> {
 export const api = {
   overview: () => get<Overview>('/api/overview'),
   sessions: () => get<{ sessions: SessionSummary[] }>('/api/sessions'),
-  timeline: (sessionId: string) =>
-    get<{ sessionId: string; entries: Array<{ record: MemoryRecord; time: string }> }>(
-      `/api/sessions/${encodeURIComponent(sessionId)}`,
+  records: (sessionId: string | null) =>
+    get<{ records: MemoryRecord[] }>(
+      sessionId ? `/api/records?session=${encodeURIComponent(sessionId)}` : '/api/records',
     ),
   decisions: () => get<{ records: MemoryRecord[] }>('/api/decisions'),
   search: (query: string) =>

@@ -6,6 +6,9 @@ import {
   DecisionRecord,
   DistillationResult,
   EventType,
+  DiscoveryRecord,
+  effectiveSignificance,
+  isForeground,
   MemoryEvent,
   MemoryRecord,
   QuestionRecord,
@@ -286,5 +289,139 @@ describe('BackstoryConfig', () => {
 
   it('rejects an unknown config key rather than ignoring it', () => {
     expect(BackstoryConfig.safeParse({ quietWindowMinutes: 5, verbose: true }).success).toBe(false);
+  });
+});
+
+describe('what belongs in the readable view', () => {
+  const base = {
+    id: 'x',
+    sessionId: 'ses-1',
+    episodeId: null,
+    createdAt: '2026-08-25T09:00:00Z',
+    source,
+    significance: 'working' as const,
+  };
+
+  function decisionBy(
+    proposedBy: 'human' | 'agent',
+    acceptedBy: 'human' | 'agent' | 'implicit',
+    significance: 'business' | 'technical' | 'direction' | 'working' = 'technical',
+  ) {
+    return DecisionRecord.parse({
+      ...base,
+      type: 'decision',
+      significance,
+      question: 'Which approach?',
+      choice: 'That one',
+      reason: 'Because.',
+      alternatives: [],
+      attribution: {
+        proposedBy: { type: proposedBy, id: `${proposedBy}:1` },
+        acceptedBy: acceptedBy === 'implicit' ? 'implicit' : { type: acceptedBy, id: `${acceptedBy}:1` },
+      },
+      status: 'accepted',
+      supersededBy: null,
+      relationships: [],
+    });
+  }
+
+  it('demotes a technical decision the agent made alone', () => {
+    // The classifier keeps calling these technical. Attribution says otherwise,
+    // and attribution is recorded rather than judged.
+    const record = decisionBy('agent', 'implicit', 'technical');
+
+    expect(effectiveSignificance(record)).toBe('working');
+    expect(isForeground(record)).toBe(false);
+  });
+
+  it('keeps a technical decision the developer approved', () => {
+    expect(effectiveSignificance(decisionBy('agent', 'human', 'technical'))).toBe('technical');
+    expect(isForeground(decisionBy('agent', 'human', 'technical'))).toBe(true);
+  });
+
+  it('treats anything the developer proposed as a direction', () => {
+    expect(effectiveSignificance(decisionBy('human', 'human', 'working'))).toBe('direction');
+  });
+
+  it('keeps a domain fact the agent found alone', () => {
+    // A fact about the problem is worth keeping whoever noticed it.
+    expect(effectiveSignificance(decisionBy('agent', 'implicit', 'business'))).toBe('business');
+  });
+
+  it('promotes an approved decision the classifier called working', () => {
+    expect(effectiveSignificance(decisionBy('agent', 'human', 'working'))).toBe('technical');
+  });
+
+  it('keeps discoveries on their own merit', () => {
+    const discovery = DiscoveryRecord.parse({
+      ...base,
+      type: 'discovery',
+      significance: 'business',
+      text: 'Webhook delivery is not idempotent.',
+    });
+
+    expect(isForeground(discovery)).toBe(true);
+  });
+
+  it('demotes a discovery about the agent’s own work', () => {
+    const discovery = DiscoveryRecord.parse({
+      ...base,
+      type: 'discovery',
+      significance: 'working',
+      text: 'Reading the whole file took 995ms.',
+    });
+
+    expect(isForeground(discovery)).toBe(false);
+  });
+
+  it('treats a question the developer asked as a direction', () => {
+    const question = QuestionRecord.parse({
+      ...base,
+      type: 'question',
+      significance: 'working',
+      question: 'Why does search return nothing?',
+      answer: null,
+      status: 'open',
+      actor: { type: 'human', id: 'human:local' },
+    });
+
+    expect(effectiveSignificance(question)).toBe('direction');
+  });
+
+  it('demotes actions and outcomes, which git already records', () => {
+    const action = ActionRecord.parse({
+      ...base,
+      type: 'action',
+      significance: 'technical',
+      description: 'Added the queue job.',
+      status: 'completed',
+      files: [],
+    });
+
+    expect(isForeground(action)).toBe(false);
+  });
+
+  it('keeps an action that carries product meaning', () => {
+    const action = ActionRecord.parse({
+      ...base,
+      type: 'action',
+      significance: 'business',
+      description: 'Shipped the public cancellation endpoint.',
+      status: 'completed',
+      files: [],
+    });
+
+    expect(isForeground(action)).toBe(true);
+  });
+
+  it('defaults an unclassified record to working rather than promoting it', () => {
+    const discovery = DiscoveryRecord.parse({
+      ...base,
+      significance: undefined,
+      type: 'discovery',
+      text: 'Something.',
+    });
+
+    expect(discovery.significance).toBe('working');
   });
 });

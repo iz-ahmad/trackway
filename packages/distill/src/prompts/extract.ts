@@ -21,17 +21,22 @@ Return ONLY a JSON object. No prose before or after it, no markdown fences.
 
 Shape:
 {
-  "questions":   [{ "question": str, "answer": str|null, "status": "open"|"resolved",
+  "questions":   [{ "significance": SIG, "question": str, "answer": str|null,
+                    "status": "open"|"resolved",
                     "actor": { "type": "human"|"agent", "id": str } }],
-  "discoveries": [{ "text": str }],
-  "decisions":   [{ "question": str, "choice": str, "reason": str,
+  "discoveries": [{ "significance": SIG, "text": str }],
+  "decisions":   [{ "significance": SIG, "question": str, "choice": str, "reason": str,
                     "alternatives": [{ "choice": str, "status": "rejected"|"considered",
                                        "reason": str, "condition": str|null }],
                     "attribution": { "proposedBy": { "type": ..., "id": str },
                                      "acceptedBy": { "type": ..., "id": str } | "implicit" } }],
-  "actions":     [{ "description": str, "status": "completed"|"partial"|"failed", "files": [str] }],
-  "outcomes":    [{ "text": str, "result": "passed"|"failed"|"unresolved" }]
+  "actions":     [{ "significance": SIG, "description": str,
+                    "status": "completed"|"partial"|"failed", "files": [str] }],
+  "outcomes":    [{ "significance": SIG, "text": str,
+                    "result": "passed"|"failed"|"unresolved" }]
 }
+
+SIG is one of "business" | "technical" | "direction" | "working".
 
 WHAT TO RECORD
 
@@ -59,6 +64,49 @@ Do NOT record:
 - The same decision more than once, however many times it was discussed.
 - Anything you are inferring rather than observing. If the session does not
   show it, it did not happen.
+
+SIGNIFICANCE
+
+This is the most consequential field you set. It decides whether a record
+appears in the project's history or in the agent's working notes, and getting
+it wrong is what makes a record list unreadable.
+
+"business" — what the product should do, for whom, and why. Product logic
+decided or learned. It would still be true after a full rewrite.
+  "Target businesses rather than developers, because developers do not pay
+   for this and free incumbents already dominate."
+  "Webhook delivery is not idempotent, so cancellation has to tolerate
+   duplicates."
+
+"technical" — an engineering choice that shapes the project. What to support,
+which approach, what the architecture is. A developer would defend it in a
+review, and someone new to the team needs to know it.
+  "Read the agents' own session files rather than building live hooks."
+  "Support three agents rather than one."
+
+"direction" — an instruction the developer gave that steered the work. The
+agent did not decide this; it was handed down. Record what was asked and why,
+if a reason was given.
+  "Do not gate the release on a precision score."
+  "Test it against real data before shipping."
+
+"working" — the agent's own detail while executing. Parse strategy, data
+shapes, what goes in a hash, whether to stream or read whole, which regular
+expression, how a function is named. Real work, and kept, but it belongs in
+the working notes rather than the project's history.
+  "Read only the head of the file instead of all of it."
+  "Exclude the offset range from the identity hash."
+
+Most of what a session produces is "working". Expect roughly two thirds.
+
+Two tests, in order:
+  1. Would someone who never opens this codebase still care? If yes, it is
+     business or technical, never working.
+  2. Did the developer ask for it rather than the agent choose it? If yes, it
+     is direction.
+
+When torn, choose "working". Wrongly promoting a detail buries the records
+that matter, which costs more than wrongly demoting one.
 
 CONDITIONS ON REJECTED OPTIONS
 

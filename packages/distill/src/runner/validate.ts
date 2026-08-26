@@ -42,10 +42,15 @@ const RawAttribution = z.strictObject({
   acceptedBy: RawAcceptance,
 });
 
+const RawSignificance = z
+  .enum(['business', 'technical', 'direction', 'working'])
+  .default('working');
+
 export const RawDistillation = z.strictObject({
   questions: z
     .array(
       z.strictObject({
+        significance: RawSignificance,
         question: z.string().min(1),
         answer: z.string().nullable().default(null),
         status: z.enum(['open', 'resolved']),
@@ -53,10 +58,13 @@ export const RawDistillation = z.strictObject({
       }),
     )
     .default([]),
-  discoveries: z.array(z.strictObject({ text: z.string().min(1) })).default([]),
+  discoveries: z
+    .array(z.strictObject({ significance: RawSignificance, text: z.string().min(1) }))
+    .default([]),
   decisions: z
     .array(
       z.strictObject({
+        significance: RawSignificance,
         question: z.string().min(1),
         choice: z.string().min(1),
         reason: z.string().min(1),
@@ -68,6 +76,7 @@ export const RawDistillation = z.strictObject({
   actions: z
     .array(
       z.strictObject({
+        significance: RawSignificance,
         description: z.string().min(1),
         status: z.enum(['completed', 'partial', 'failed']),
         files: z.array(z.string()).default([]),
@@ -77,6 +86,7 @@ export const RawDistillation = z.strictObject({
   outcomes: z
     .array(
       z.strictObject({
+        significance: RawSignificance,
         text: z.string().min(1),
         /**
          * Models return an empty string here often enough that rejecting the

@@ -60,6 +60,7 @@ function recordFor(sessionId: string, id: string): MemoryRecord {
     type: 'discovery',
     sessionId,
     episodeId: null,
+    significance: 'technical',
     createdAt: NOW.toISOString(),
     source: {
       adapter: 'fake',

@@ -10,3 +10,4 @@ export * from './index/upsert.js';
 export * from './index/build.js';
 export * from './search/query.js';
 export * from './errors/isolate.js';
+export * from './store/episodes.js';

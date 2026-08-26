@@ -1,5 +1,22 @@
 export type RecordType = 'question' | 'discovery' | 'decision' | 'action' | 'outcome';
 
+export type Significance = 'business' | 'technical' | 'direction' | 'working';
+
+export const KIND_LABEL: Record<Significance, string> = {
+  business: 'product',
+  technical: 'technical',
+  direction: 'your call',
+  working: 'working',
+};
+
+/** What each kind means, shown where a reader might not know. */
+export const KIND_BLURB: Record<Significance, string> = {
+  business: 'What the product should do, and why',
+  technical: 'An engineering choice you made or approved',
+  direction: 'Something you told the agent to do',
+  working: "The agent's own detail while building",
+};
+
 export interface ActorRef {
   type: 'human' | 'agent';
   id: string;
@@ -17,6 +34,7 @@ interface BaseRecord {
   sessionId: string;
   episodeId: string | null;
   createdAt: string;
+  significance: Significance;
 }
 
 export interface QuestionRecord extends BaseRecord {
@@ -71,9 +89,25 @@ export interface SessionSummary {
   lastAt: string;
 }
 
+export interface Episode {
+  id: string;
+  title: string;
+  count: number;
+  foreground: number;
+  firstAt: string;
+}
+
 export interface Overview {
   sessions: SessionSummary[];
-  counts: { sessions: number; records: number; decisions: number; rejected: number };
+  episodes: Episode[];
+  counts: {
+    sessions: number;
+    records: number;
+    decisions: number;
+    rejected: number;
+    foreground: number;
+  };
+  byKind: Record<Significance, number>;
 }
 
 /** The title a record shows in a list. */
@@ -90,6 +124,37 @@ export function titleOf(record: MemoryRecord): string {
     case 'outcome':
       return record.text;
   }
+}
+
+/**
+ * The kind a record counts as, after its recorded attribution is applied.
+ *
+ * Mirrors the same rule the server uses. The classifier is generous with
+ * `technical`, and attribution is the recorded answer to the question it is
+ * guessing at: a person's involvement is what makes an engineering choice part
+ * of the project's story rather than the agent's working notes.
+ */
+export function kindOf(record: MemoryRecord): Significance {
+  if (record.type === 'decision') {
+    const { proposedBy, acceptedBy } = record.attribution;
+    if (proposedBy.type === 'human') return 'direction';
+    if (acceptedBy === 'implicit') {
+      return record.significance === 'business' ? 'business' : 'working';
+    }
+    return record.significance === 'working' ? 'technical' : record.significance;
+  }
+
+  if (record.type === 'question') {
+    return record.actor.type === 'human' ? 'direction' : record.significance;
+  }
+
+  if (record.type === 'discovery') return record.significance;
+
+  return record.significance === 'business' ? 'business' : 'working';
+}
+
+export function isForeground(record: MemoryRecord): boolean {
+  return kindOf(record) !== 'working';
 }
 
 /**

@@ -1,16 +1,23 @@
 import {
+  effectiveSignificance,
   getRecord,
+  isForeground,
   listRecords,
   listSessions,
+  readEpisodes,
   search,
   searchAlternatives,
+  type Episode,
   type IndexDatabase,
   type MemoryRecord,
+  type Significance,
 } from '@backstory/core';
 import { Hono } from 'hono';
 
 export interface ApiOptions {
   db: IndexDatabase;
+  /** Where episodes.yml lives. Absent in tests that only exercise records. */
+  storeDir?: string;
 }
 
 export interface TimelineEntry {
@@ -34,7 +41,21 @@ export function createApi(options: ApiOptions): Hono {
   const app = new Hono();
   const { db } = options;
 
+  const episodes = async (): Promise<Episode[]> =>
+    options.storeDir ? readEpisodes(options.storeDir) : [];
+
   app.get('/api/sessions', (c) => c.json({ sessions: listSessions(db) }));
+
+  /** Every record, optionally for one session, oldest first so it reads as a story. */
+  app.get('/api/records', (c) => {
+    const sessionId = c.req.query('session');
+    const records = listRecords(db, {
+      ...(sessionId ? { sessionId } : {}),
+      limit: 5000,
+    }).sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+
+    return c.json({ records });
+  });
 
   app.get('/api/sessions/:id', (c) => {
     const sessionId = c.req.param('id');
@@ -83,32 +104,67 @@ export function createApi(options: ApiOptions): Hono {
 
   app.get('/api/decisions', (c) => {
     const actor = c.req.query('actor');
-    return c.json({
-      records: listRecords(db, {
-        types: ['decision'],
-        ...(actor === 'human' || actor === 'agent' ? { actor } : {}),
-        limit: 500,
-      }),
+    const records = listRecords(db, {
+      types: ['decision'],
+      ...(actor === 'human' || actor === 'agent' ? { actor } : {}),
+      limit: 2000,
     });
+
+    // Project-level decisions first, then by recency. A reader opening the map
+    // should land on something that mattered.
+    const rank = (record: MemoryRecord) => (isForeground(record) ? 0 : 1);
+    records.sort((a, b) => rank(a) - rank(b) || (a.createdAt < b.createdAt ? 1 : -1));
+
+    return c.json({ records });
   });
 
-  /** Everything the project-history view needs, in one request. */
-  app.get('/api/overview', (c) => {
+  /** Everything the overview needs, in one request. */
+  app.get('/api/overview', async (c) => {
     const sessions = listSessions(db);
-    const decisions = listRecords(db, { types: ['decision'], limit: 1000 });
+    const all = listRecords(db, { limit: 5000 });
+    const decisions = all.filter((record) => record.type === 'decision');
 
-    const rejectedCount = decisions.reduce(
+    const rejected = decisions.reduce(
       (total, record) => total + (record.type === 'decision' ? record.alternatives.length : 0),
       0,
     );
 
+    const byKind: Record<Significance, number> = {
+      business: 0,
+      technical: 0,
+      direction: 0,
+      working: 0,
+    };
+    for (const record of all) byKind[effectiveSignificance(record)] += 1;
+
+    const titles = await episodes();
+    const grouped = titles
+      .map((episode) => {
+        const members = all.filter((record) => record.episodeId === episode.id);
+        return {
+          id: episode.id,
+          title: episode.title,
+          count: members.length,
+          foreground: members.filter(isForeground).length,
+          firstAt: members.reduce(
+            (earliest, record) => (record.createdAt < earliest ? record.createdAt : earliest),
+            members[0]?.createdAt ?? '',
+          ),
+        };
+      })
+      .filter((episode) => episode.count > 0)
+      .sort((a, b) => (a.firstAt < b.firstAt ? -1 : 1));
+
     return c.json({
       sessions,
+      episodes: grouped,
+      byKind,
       counts: {
         sessions: sessions.length,
-        records: sessions.reduce((total, session) => total + session.recordCount, 0),
+        records: all.length,
         decisions: decisions.length,
-        rejected: rejectedCount,
+        rejected,
+        foreground: all.filter(isForeground).length,
       },
     });
   });

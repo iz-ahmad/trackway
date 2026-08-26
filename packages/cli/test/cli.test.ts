@@ -44,6 +44,7 @@ function decisionRecord(overrides: Partial<Extract<MemoryRecord, { type: 'decisi
     sessionId: 'ses-1',
     episodeId: null,
     createdAt: '2026-08-25T09:18:00Z',
+    significance: 'technical' as const,
     source: {
       adapter: 'claude-code',
       sessionId: 'ses-1',
