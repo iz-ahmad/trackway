@@ -189,12 +189,37 @@ export function toRecords(text: string, provenance: Provenance): MemoryRecord[] 
 
   const raw = parsed.data;
 
+  /*
+   * An answered question is a decision that happened to be phrased as one.
+   * Left as a question it sits beside the decision that answered it, and a
+   * reader cannot tell resolved work from open work. Only genuinely open
+   * questions stay questions.
+   */
+  const openQuestions = raw.questions.filter((q) => !q.answer || q.status === 'open');
+  const answeredAsDecisions = raw.questions
+    .filter((q) => q.answer && q.status === 'resolved')
+    .map((q) => ({
+      significance: q.significance,
+      question: q.question,
+      choice: q.answer as string,
+      reason: 'Recorded as an answered question during the session.',
+      alternatives: [],
+      attribution: {
+        proposedBy: q.actor,
+        acceptedBy: (q.actor.type === 'human' ? q.actor : 'implicit') as
+          | typeof q.actor
+          | 'implicit',
+      },
+    }));
+
   const result = DistillationResult.parse({
-    questions: raw.questions.map((q) => withDerivedId({ ...base, type: 'question' as const, ...q })),
+    questions: openQuestions.map((q) =>
+      withDerivedId({ ...base, type: 'question' as const, ...q, answer: null, status: 'open' as const }),
+    ),
     discoveries: raw.discoveries.map((d) =>
       withDerivedId({ ...base, type: 'discovery' as const, ...d }),
     ),
-    decisions: raw.decisions.map((d) =>
+    decisions: [...raw.decisions, ...answeredAsDecisions].map((d) =>
       withDerivedId({
         ...base,
         type: 'decision' as const,

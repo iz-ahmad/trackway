@@ -14,3 +14,4 @@ export * from './eval/judge.js';
 export * from './chunk.js';
 export * from './dedupe.js';
 export * from './organize.js';
+export * from './harvest.js';

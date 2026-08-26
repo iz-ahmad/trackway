@@ -92,15 +92,17 @@ const descriptor: SessionDescriptor = {
 };
 
 describe('validating model output', () => {
-  it('turns well-formed output into records of every type', () => {
+  it('turns well-formed output into records', () => {
     const records = toRecords(JSON.stringify(wellFormed), provenance);
 
+    // The fixture's question was answered, so it lands as a second decision
+    // rather than as a question sitting beside the one that answered it.
     expect(records.map((r) => r.type).sort()).toEqual([
       'action',
       'decision',
+      'decision',
       'discovery',
       'outcome',
-      'question',
     ]);
   });
 
@@ -114,7 +116,7 @@ describe('validating model output', () => {
       fromOffset: 0,
       toOffset: 12,
     });
-    expect(record?.id).toMatch(/^q-\d{8}-[0-9a-f]{8}$/);
+    expect(record?.id).toMatch(/^[a-z]+-\d{8}-[0-9a-f]{8}$/);
   });
 
   it('preserves rejected alternatives and their conditions', () => {
@@ -805,5 +807,67 @@ describe('chunk boundaries', () => {
     }
 
     expect(seen.size).toBe(400);
+  });
+});
+
+describe('answered questions become decisions', () => {
+  it('records an answered question as a decision, not a question', () => {
+    // Left as questions they sit beside the decisions that answered them, and
+    // a reader cannot tell resolved work from open work.
+    const records = toRecords(
+      JSON.stringify({
+        questions: [
+          {
+            question: 'Should cancellation be asynchronous?',
+            answer: 'Yes, callbacks are slow.',
+            status: 'resolved',
+            actor: { type: 'human', id: 'human:local' },
+          },
+        ],
+      }),
+      provenance,
+    );
+
+    expect(records.filter((r) => r.type === 'question')).toHaveLength(0);
+
+    const decision = records.find((r) => r.type === 'decision');
+    expect(decision?.type === 'decision' && decision.choice).toBe('Yes, callbacks are slow.');
+  });
+
+  it('keeps a genuinely open question as a question', () => {
+    const records = toRecords(
+      JSON.stringify({
+        questions: [
+          {
+            question: 'Do we need a dead letter queue?',
+            answer: null,
+            status: 'open',
+            actor: { type: 'human', id: 'human:local' },
+          },
+        ],
+      }),
+      provenance,
+    );
+
+    expect(records.filter((r) => r.type === 'question')).toHaveLength(1);
+  });
+
+  it('attributes an answered question the developer asked to the developer', () => {
+    const records = toRecords(
+      JSON.stringify({
+        questions: [
+          {
+            question: 'Which store?',
+            answer: 'Redis.',
+            status: 'resolved',
+            actor: { type: 'human', id: 'human:local' },
+          },
+        ],
+      }),
+      provenance,
+    );
+
+    const decision = records.find((r) => r.type === 'decision');
+    expect(decision?.type === 'decision' && decision.attribution.proposedBy.type).toBe('human');
   });
 });

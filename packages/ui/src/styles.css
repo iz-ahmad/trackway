@@ -556,6 +556,7 @@ select {
   font-weight: 580;
   letter-spacing: -0.011em;
   line-height: 1.36;
+  margin-bottom: 1px;
 }
 
 .record[data-kind='working'] h3 {

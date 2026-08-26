@@ -21,8 +21,8 @@ Return ONLY a JSON object. No prose before or after it, no markdown fences.
 
 Shape:
 {
-  "questions":   [{ "significance": SIG, "question": str, "answer": str|null,
-                    "status": "open"|"resolved",
+  "questions":   [{ "significance": SIG, "question": str, "answer": null,
+                    "status": "open",
                     "actor": { "type": "human"|"agent", "id": str } }],
   "discoveries": [{ "significance": SIG, "text": str }],
   "decisions":   [{ "significance": SIG, "question": str, "choice": str, "reason": str,
@@ -51,11 +51,15 @@ Record:
   what was considered and discarded.
 - Discoveries: facts learned about the system that were not obvious beforehand
   and would change how someone approaches related work.
-- Questions that shaped the work, especially ones left unresolved.
+- Questions ONLY when they were never resolved. A question that got answered
+  is a decision, so record it as one with the answer as the choice. A record
+  list full of answered questions sitting beside the decisions that answered
+  them reads as unfinished work that is not actually unfinished.
 - Actions only when they carry intent that the diff alone does not.
 - Outcomes only when they resolve something that was genuinely in doubt.
 
 Do NOT record:
+- A question that was answered. Record the decision instead.
 - Routine file reading, searching, or navigation.
 - Restating what the code already says.
 - Obvious next steps, or narration of what is about to happen.
@@ -140,6 +144,8 @@ export interface PromptInput {
   adapterId: string;
   /** Set when a session was split, so the model knows it is seeing a slice. */
   part?: { index: number; total: number };
+  /** Forks already recorded verbatim, so the model does not restate them. */
+  alreadyCaptured?: string;
 }
 
 /**
@@ -192,7 +198,7 @@ export function buildPrompt(input: PromptInput): string {
     ? `\n\nThis is part ${input.part.index} of ${input.part.total} of one session. Record only what this part shows. Earlier and later parts are handled separately, so do not speculate about what came before or after.`
     : '';
 
-  return `${EXTRACTION_INSTRUCTIONS}${partNote}
+  return `${EXTRACTION_INSTRUCTIONS}${partNote}${input.alreadyCaptured ?? ''}
 
 SESSION TRANSCRIPT (agent: ${input.adapterId}, ${input.events.length} events)
 ---

@@ -1,5 +1,6 @@
-import type { MemoryRecord } from '@backstory/core';
+import { withDerivedId, type MemoryRecord } from '@backstory/core';
 import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
+import { describeForksForPrompt, forkAlternatives, harvestForks, type HarvestedFork } from './harvest.js';
 import { collapseNearDuplicates } from './dedupe.js';
 import { buildPrompt } from './prompts/extract.js';
 import type { DistillRunner } from './runner/contract.js';
@@ -16,6 +17,52 @@ export interface DistillerOptions {
 }
 
 const DEFAULT_MAX_CHUNKS = 12;
+
+/**
+ * Turns a recorded fork into a decision.
+ *
+ * Attribution is certain here in a way it never is from prose: the agent asked
+ * and a person answered, so it is recorded as exactly that. When the session
+ * did not capture which option was taken, the fork is still worth keeping for
+ * its options, and the choice says so rather than guessing.
+ */
+function forkToRecord(
+  fork: HarvestedFork,
+  sessionId: string,
+  adapter: string,
+  sessionFile: string,
+): MemoryRecord {
+  return withDerivedId({
+    type: 'decision' as const,
+    sessionId,
+    episodeId: null,
+    significance: 'technical' as const,
+    createdAt: fork.timestamp,
+    source: {
+      adapter,
+      sessionId,
+      sessionFile,
+      fromOffset: fork.offset,
+      toOffset: fork.offset,
+    },
+    question: fork.question,
+    choice: fork.chosen ?? 'Not recorded',
+    reason: fork.chosen
+      ? (fork.options.find((option) => option.label === fork.chosen)?.reason ??
+        'The session recorded the choice but no reasoning for it.')
+      : 'The session recorded the options but not which one was taken.',
+    alternatives: forkAlternatives(fork),
+    attribution: {
+      proposedBy: { type: 'agent' as const, id: `agent:${adapter}` },
+      acceptedBy: fork.chosen
+        ? ({ type: 'human' as const, id: 'human:local' } as const)
+        : ('implicit' as const),
+    },
+    status: 'accepted' as const,
+    supersededBy: null,
+    relationships: [],
+  }) as MemoryRecord;
+}
 
 function dedupe(records: readonly MemoryRecord[]): MemoryRecord[] {
   const seen = new Map<string, MemoryRecord>();
@@ -34,6 +81,19 @@ export function createDistiller(options: DistillerOptions): Distiller {
 
   return async ({ descriptor, events, fromOffset }): Promise<MemoryRecord[] | null> => {
     if (events.length === 0) return null;
+
+    /*
+     * Forks the session recorded literally are taken as given rather than
+     * re-derived. They carry the exact question, every option, and each
+     * option's own argument, written before anyone knew which way it would go.
+     * Asking a model to reconstruct that from prose loses most of it: measured
+     * on one real session, twelve recorded forks came back as decisions with a
+     * median of one alternative.
+     */
+    const forks = harvestForks(events);
+    const harvested = forks.map((fork) =>
+      forkToRecord(fork, descriptor.sessionId, descriptor.adapter, descriptor.sessionFile),
+    );
 
     const cap = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
 
@@ -56,10 +116,15 @@ export function createDistiller(options: DistillerOptions): Distiller {
     const failures: unknown[] = [];
 
     for (const chunk of batch) {
+      const inChunk = forks.filter(
+        (fork) => fork.offset >= chunk.fromOffset && fork.offset <= chunk.toOffset,
+      );
+
       const prompt = buildPrompt({
         events: chunk.events,
         adapterId: descriptor.adapter,
         ...(chunk.total > 1 ? { part: { index: chunk.index + 1, total: chunk.total } } : {}),
+        ...(inChunk.length > 0 ? { alreadyCaptured: describeForksForPrompt(inChunk) } : {}),
       });
 
       try {
@@ -91,6 +156,8 @@ export function createDistiller(options: DistillerOptions): Distiller {
     // Two passes. Identical records collapse on their id; records that say the
     // same thing in different words need comparing, because the model rewords
     // between chunks and a hash of different words is a different hash.
-    return collapseNearDuplicates(dedupe(records));
+    // Harvested forks come first so a near-duplicate from the model collapses
+    // into the recorded one rather than replacing it.
+    return collapseNearDuplicates(dedupe([...harvested, ...records]));
   };
 }
