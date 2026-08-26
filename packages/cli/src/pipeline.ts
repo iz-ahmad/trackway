@@ -89,7 +89,11 @@ export async function persist(
   if (records.length === 0) return { written: 0, skipped: 0 };
 
   const results = await writeRecords(workspace.recordsDir, records);
-  const written = results.filter((result) => result.written).length;
+
+  // Records sharing an identity collapse onto one file, which is the intended
+  // dedup. Counting write attempts reported 113 for 101 files; count distinct
+  // records instead.
+  const written = new Set(results.filter((result) => result.written).map((r) => r.id)).size;
 
   const db = openWorkspaceIndex(workspace);
   try {

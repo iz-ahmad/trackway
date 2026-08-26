@@ -19,6 +19,7 @@ import {
   readConfigResult,
   rejectedCommand,
   searchCommand,
+  statusCommand,
   sessionsCommand,
   showCommand,
   writeConfig,
@@ -468,5 +469,42 @@ describe('an unusable config file', () => {
     await searchCommand('anything', { noSync: true }, io);
 
     expect(io.errors.join('\n')).toContain('warning:');
+  });
+});
+
+describe('when the index and the files disagree', () => {
+  it('reports the drift rather than trusting the index', async () => {
+    // Deleting a record file by hand leaves the index holding rows for records
+    // that no longer exist. Status reported 197 records when 101 were on disk.
+    const workspace = await loadWorkspace(repo);
+    await persist(workspace!, [decisionRecord()]);
+    await rm(join(workspace!.recordsDir, 'dec-20260825-aaaaaaaa.md'));
+
+    const io = captureIo();
+    await statusCommand({}, io);
+
+    expect(io.lines.join('\n')).toContain('backstory rebuild');
+  });
+
+  it('says nothing when the index matches the files', async () => {
+    const workspace = await loadWorkspace(repo);
+    await persist(workspace!, [decisionRecord()]);
+
+    const io = captureIo();
+    await statusCommand({}, io);
+
+    expect(io.lines.join('\n')).not.toContain('backstory rebuild');
+  });
+
+  it('counts distinct records rather than write attempts', async () => {
+    const workspace = await loadWorkspace(repo);
+
+    // Two records that collapse onto one identity are one record, not two.
+    const result = await persist(workspace!, [
+      decisionRecord(),
+      decisionRecord({ reason: 'A different reason for the same decision.' }),
+    ]);
+
+    expect(result.written).toBe(1);
   });
 });

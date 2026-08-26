@@ -8,13 +8,7 @@ import type { MemoryRecord } from '../types.js';
  * Answering "why is this like this?" is the question the product exists for, so
  * search returns whole records rather than links to them.
  */
-export function Search({
-  query,
-  onOpenDecision,
-}: {
-  query: string;
-  onOpenDecision: (id: string) => void;
-}): ReactElement {
+export function Search({ query }: { query: string }): ReactElement {
   const [records, setRecords] = useState<MemoryRecord[]>([]);
   const [searched, setSearched] = useState(false);
 
@@ -71,7 +65,7 @@ export function Search({
         </span>
       </div>
       {records.map((record) => (
-        <RecordRow key={record.id} record={record} onOpenDecision={onOpenDecision} />
+        <RecordRow key={record.id} record={record} />
       ))}
     </>
   );

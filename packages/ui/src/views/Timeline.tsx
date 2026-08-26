@@ -17,7 +17,6 @@ const KINDS: Significance[] = ['business', 'technical', 'direction'];
 
 interface Props {
   sessionId: string | null;
-  onOpenDecision: (id: string) => void;
 }
 
 /**
@@ -28,7 +27,7 @@ interface Props {
  * is what made the first version unreadable: the decision a person came for sat
  * between two notes about parsing strategy.
  */
-export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
+export function Timeline({ sessionId }: Props): ReactElement {
   const [records, setRecords] = useState<MemoryRecord[] | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -148,7 +147,7 @@ export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
 
             {open
               ? group.records.map((record) => (
-                  <RecordRow key={record.id} record={record} onOpenDecision={onOpenDecision} />
+                  <RecordRow key={record.id} record={record} />
                 ))
               : null}
           </section>

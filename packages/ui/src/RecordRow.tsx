@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { ArrowRight } from './icons.js';
 import {
   KIND_LABEL,
   attributionOf,
@@ -10,7 +9,6 @@ import {
 
 interface Props {
   record: MemoryRecord;
-  onOpenDecision?: (id: string) => void;
 }
 
 /**
@@ -20,7 +18,7 @@ interface Props {
  * product exists to preserve and hiding it behind a click would bury the point.
  * Everything else stays to a line or two.
  */
-export function RecordRow({ record, onOpenDecision }: Props): ReactElement {
+export function RecordRow({ record }: Props): ReactElement {
   const kind = kindOf(record);
   const who = attributionOf(record);
 
@@ -90,11 +88,11 @@ export function RecordRow({ record, onOpenDecision }: Props): ReactElement {
         <div className="files">{record.files.join('  ')}</div>
       ) : null}
 
-      {record.type === 'decision' && onOpenDecision ? (
-        <button className="linkish" onClick={() => onOpenDecision(record.id)}>
-          See the fork <ArrowRight />
-        </button>
-      ) : null}
+      {/*
+        No "see the fork" link: the fork is right here now. It earned its place
+        when the row was a summary, and became a link to what the reader was
+        already looking at.
+      */}
     </article>
   );
 }

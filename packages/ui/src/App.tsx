@@ -24,12 +24,6 @@ export function App(): ReactElement {
   // and returns you where you were, so search never costs you your place.
   const searching = query.trim().length >= 2;
 
-  const openDecision = (id: string) => {
-    setFocusDecision(id);
-    setQuery('');
-    setView('map');
-  };
-
   const showRail = !searching && view === 'story' && sessions.length > 1;
 
   return (
@@ -102,9 +96,9 @@ export function App(): ReactElement {
           <main className="main">
             <div className="main-inner">
               {searching ? (
-                <Search query={query} onOpenDecision={openDecision} />
+                <Search query={query} />
               ) : view === 'story' ? (
-                <Timeline sessionId={sessionId} onOpenDecision={openDecision} />
+                <Timeline sessionId={sessionId} />
               ) : (
                 <History onOpenEpisode={() => setView('story')} />
               )}

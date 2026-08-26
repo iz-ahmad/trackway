@@ -970,3 +970,88 @@ select {
     padding: 16px 14px 60px;
   }
 }
+
+/* ── the fork ──────────────────────────────────────────────────────── */
+
+/*
+ * A decision is a fork, so it is drawn as one: every option in a single stack
+ * with the taken one marked. Rendered as stacked paragraphs it was impossible
+ * to tell what was asked from what was chosen.
+ */
+.fork {
+  margin-top: 9px;
+  display: grid;
+  gap: 3px;
+}
+
+.opt {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 9px;
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  font-size: 12.9px;
+}
+
+.opt.taken {
+  background: var(--taken-bg);
+}
+
+.opt.dropped {
+  background: var(--surface-sunken);
+}
+
+.opt .mark {
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.62;
+}
+
+.opt.taken .mark {
+  color: var(--taken);
+}
+
+.opt.dropped .mark {
+  color: var(--dropped);
+}
+
+.opt .label {
+  font-weight: 570;
+  line-height: 1.4;
+  text-wrap: pretty;
+  margin-bottom: 1px;
+}
+
+.opt.taken .label {
+  color: var(--taken);
+}
+
+.opt.dropped .label {
+  color: var(--text-soft);
+}
+
+.opt .reason {
+  color: var(--text-soft);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.opt.dropped .reason {
+  color: var(--text-faint);
+}
+
+.opt .cond {
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-size: 12.2px;
+}
+
+/* A harvested question is the full prompt as asked, which runs long. */
+.record[data-type='decision'] h3 {
+  font-size: 14.6px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

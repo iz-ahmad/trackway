@@ -2,6 +2,7 @@ import { defaultRegistry } from '@backstory/adapters';
 import {
   BackstoryConfig,
   forgetRecord,
+  readAllRecords,
   forgetSession,
   getRecord,
   listRecords,
@@ -166,6 +167,19 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
   }
 
   io.out(`Store:   ${workspace.config.storePath}/  (${total} records across ${sessions.length} sessions)`);
+
+  // The index is derived, so it can disagree with the files after a record is
+  // deleted by hand. Nothing detected that, and status happily reported 197
+  // records when 101 existed.
+  const onDisk = await readAllRecords(workspace.recordsDir);
+  if (onDisk.records.length !== total) {
+    io.out(
+      `\nThe index lists ${total} records but ${onDisk.records.length} are on disk. Run: backstory rebuild`,
+    );
+  }
+  if (onDisk.failures.length > 0) {
+    io.out(`${onDisk.failures.length} record file(s) could not be read.`);
+  }
 
   io.out('\nAgents:');
   for (const status of await defaultRegistry().status()) {
