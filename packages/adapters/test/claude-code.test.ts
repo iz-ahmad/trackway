@@ -19,6 +19,8 @@ const FIXTURE_SESSION = join(FIXTURES, '-fixture-repo', 'fixture-session-1.jsonl
 
 /** The fixture is a real session, anonymized, with two markers planted in it. */
 const REASONING_SENTINEL = 'SENTINEL_REASONING_MUST_NOT_SURVIVE';
+// A credential in a URL: the redactor catches it and no provider scanner
+// claims the shape, so the fixture cannot block a push.
 const SECRET_SENTINEL = 'https://ci-deploy:PLANTED-CREDENTIAL@internal.example.test/artifacts';
 
 let scratch: string;
