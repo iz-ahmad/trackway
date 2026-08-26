@@ -49,8 +49,9 @@ Record:
 - Rejected alternatives, with WHY each was dropped. This is the most valuable
   thing you can capture. Commit history records what was built; nothing records
   what was considered and discarded.
-- Discoveries: facts learned about the system that were not obvious beforehand
-  and would change how someone approaches related work.
+- Discoveries, but only about things this project does not control: another
+  tool's behaviour, the shape or scale of the data, a domain fact, a general
+  truth about an approach. These survive a rewrite of this codebase.
 - Questions ONLY when they were never resolved. A question that got answered
   is a decision, so record it as one with the answer as the choice. A record
   list full of answered questions sitting beside the decisions that answered
@@ -68,6 +69,9 @@ Do NOT record:
 - The same decision more than once, however many times it was discussed.
 - Anything you are inferring rather than observing. If the session does not
   show it, it did not happen.
+- A bug found in this project's own code, or a note about how its own code
+  behaves. The fix is in the code and the decision explains why, so the
+  discovery only repeats them. These are the largest single source of noise.
 
 SIGNIFICANCE
 
@@ -81,6 +85,22 @@ decided or learned. It would still be true after a full rewrite.
    for this and free incumbents already dominate."
   "Webhook delivery is not idempotent, so cancellation has to tolerate
    duplicates."
+
+FOR A DISCOVERY, the test is where the fact lives. A fact about something
+outside this codebase is business or technical. A fact about this codebase is
+"working", however hard-won.
+
+  keep (outside, survives a rewrite):
+    "OpenCode moved its storage to SQLite; its CLI needs a terminal."
+    "There are 344 session files on disk across three agents."
+    "Word overlap cannot score a paraphrase; a correct one scored 0.06."
+    "Agent hooks live in user settings, so one install covers every repo."
+
+  working (our own code, where the fix is already the record):
+    "Our identity hash included mutable fields, so superseding changed the id."
+    "Our chunker capped at 200 events and silently dropped the rest."
+    "The episodeId field was never populated by our distiller."
+    "Our adapters use different backing strategies."
 
 "technical" — an engineering choice that shapes the project. What to support,
 which approach, what the architecture is. A developer would defend it in a

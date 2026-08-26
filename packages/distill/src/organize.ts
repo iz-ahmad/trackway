@@ -2,6 +2,7 @@ import type { MemoryRecord } from '@backstory/core';
 import { z } from 'zod';
 import type { DistillRunner } from './runner/contract.js';
 import { extractJsonObject } from './runner/validate.js';
+import { triageDiscoveries } from './triage.js';
 
 const Organization = z.strictObject({
   episodes: z.array(
@@ -80,7 +81,14 @@ export async function organizeSession(
     significance: assigned[String(index)] ?? record.significance,
   }));
 
-  return { records: updated, episodes };
+  /*
+   * Discovery triage is a separate call on purpose. Folded into the prompt
+   * above it was ignored twice, keeping 27 of 27 discoveries including both
+   * halves of two duplicate bug reports. Asked on its own it separates them.
+   */
+  const triaged = await triageDiscoveries(runner, updated);
+
+  return { records: triaged, episodes };
 }
 
 /** How the developer figured in a record, when the record knows. */
@@ -139,6 +147,14 @@ SECOND: classify every record into one of four kinds.
               decided or learned. Still true after a full rewrite. This is the
               only kind an agent may have arrived at alone and still keep,
               because a fact about the domain is valuable whoever found it.
+
+              For a DISCOVERY, the test is where the fact lives. A fact about
+              something outside this codebase (another tool's behaviour, the
+              shape of the data, a general truth) is business or technical. A
+              fact about this codebase, including a bug found in it, is
+              "working": the fix is in the code and a decision already explains
+              it, so the discovery only repeats them. Bug-report discoveries
+              about our own work are the largest single source of noise.
 "technical" — an architecture-shaping choice THE DEVELOPER MADE OR APPROVED.
               What the system supports, which approach it takes, what ships.
               A choice the agent made alone is not this, however clever, unless
