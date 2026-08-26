@@ -24,6 +24,9 @@ coverage/
 .env.*
 !.env.example
 
+# Scratch from the design skill's decision pages.
+.impeccable/questions/
+
 # Editor and OS
 .DS_Store
 .idea/

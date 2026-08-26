@@ -1,116 +1,119 @@
-import { useEffect, useState, type ReactElement } from 'react';
-import { api } from '../api.js';
-import { Loading, Problem, plural } from './Timeline.js';
-import { KIND_BLURB, KIND_LABEL, type Overview, type Significance } from '../types.js';
+import { useMemo, type ReactElement } from 'react';
+import { tone } from '../RecordRow.js';
+import { FirstRun, plural } from './Timeline.js';
+import {
+  KIND_BLURB,
+  KIND_LABEL,
+  kindOf,
+  type Episode,
+  type MemoryRecord,
+  type Significance,
+} from '../types.js';
 
 const KINDS: Significance[] = ['business', 'technical', 'direction', 'working'];
 
+interface Props {
+  /** Everything in the session, for the totals each proportion is measured against. */
+  records: MemoryRecord[];
+  /** What the rail's filters leave, so the page answers to the same controls. */
+  visible: MemoryRecord[];
+  episodes: Episode[];
+  sessions: number;
+  onOpenTopic: (id: string) => void;
+}
+
 /**
- * Where a reader orients: what this project's memory actually holds, and which
- * topics are worth opening.
+ * What this project's memory holds, and which topics are worth opening.
  *
- * The first version showed four totals and a session id, which told a reader
- * nothing they could act on. Counts only earn their place next to the shape of
- * what is inside them.
+ * Everything here is derived from the records the rail already filtered, so
+ * the numbers agree with the page beside them rather than reporting a global
+ * total the reader cannot see.
  */
-export function History({ onOpenEpisode }: { onOpenEpisode: () => void }): ReactElement {
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function History({
+  records,
+  visible,
+  episodes,
+  sessions,
+  onOpenTopic,
+}: Props): ReactElement {
+  const byKind = useMemo(() => {
+    const tally: Record<string, number> = { business: 0, technical: 0, direction: 0, working: 0 };
+    for (const record of records) tally[kindOf(record)] = (tally[kindOf(record)] ?? 0) + 1;
+    return tally;
+  }, [records]);
 
-  useEffect(() => {
-    api.overview().then(setOverview).catch((cause: unknown) => setError(String(cause)));
-  }, []);
+  const topics = useMemo(() => {
+    const shown = new Map<string, number>();
+    for (const record of visible) {
+      const key = record.episodeId ?? '__ungrouped';
+      shown.set(key, (shown.get(key) ?? 0) + 1);
+    }
+    return episodes.map((episode) => ({ ...episode, shown: shown.get(episode.id) ?? 0 }));
+  }, [visible, episodes]);
 
-  if (error) return <Problem detail={error} />;
-  if (!overview) return <Loading />;
+  if (records.length === 0) return <FirstRun />;
 
-  if (overview.counts.records === 0) {
-    return (
-      <div className="empty">
-        <h3>Nothing recorded yet</h3>
-        <p>
-          Run <code>backstory sync</code> and this fills with the decisions behind your work.
-        </p>
-      </div>
-    );
-  }
-
-  const { counts, byKind, episodes } = overview;
-  const biggest = Math.max(1, ...episodes.map((episode) => episode.count));
+  const decisions = records.filter((record) => record.type === 'decision');
+  const kept = decisions.reduce(
+    (n, record) => n + (record.type === 'decision' ? record.alternatives.length : 0),
+    0,
+  );
+  const foreground = records.filter((record) => kindOf(record) !== 'working').length;
 
   return (
     <>
-      <div className="figures">
-        <Figure n={counts.foreground} label="worth reading" />
-        <Figure n={counts.decisions} label={plural(counts.decisions, 'decision')} />
-        <Figure n={counts.rejected} label="options not taken" />
-        <Figure n={counts.records} label="records in total" />
-      </div>
+      <p className="lede">
+        <b>{records.length}</b> records from <b>{sessions}</b> {plural(sessions, 'session')}.{' '}
+        <b>{foreground}</b> of them carry this project's own history rather than the agent's working
+        detail. Across all <b>{decisions.length}</b> {plural(decisions.length, 'decision')},{' '}
+        <b>{kept}</b> {plural(kept, 'option')} {kept === 1 ? 'was' : 'were'} recorded and not taken.
+      </p>
 
       <h2 className="section-title">What the records are</h2>
-      <div style={{ marginBottom: 26 }}>
+      <div className="rows">
         {KINDS.map((kind) => (
-          <div key={kind} className="topic-row" style={{ cursor: 'default' }}>
+          <div className="row" key={kind} style={tone(kind)}>
             <div>
-              <div className="name" style={{ color: `var(--${kind})` }}>
-                {KIND_LABEL[kind]}
-              </div>
+              <div className="name">{KIND_LABEL[kind]}</div>
               <div className="sub">{KIND_BLURB[kind]}</div>
             </div>
-            <div className="figures-inline">
-              <b>{byKind[kind] ?? 0}</b> of {counts.records}
+            <div className="amount">
+              <b>{byKind[kind] ?? 0}</b> / {records.length}
             </div>
-            <div className="bar" title={`${byKind[kind] ?? 0} records`}>
-              <i
-                style={{
-                  width: `${((byKind[kind] ?? 0) / Math.max(1, counts.records)) * 100}%`,
-                  background: `var(--${kind})`,
-                }}
-              />
+            <div className="spectrum">
+              <i style={{ width: `${((byKind[kind] ?? 0) / records.length) * 100}%` }} />
             </div>
           </div>
         ))}
       </div>
 
-      {episodes.length > 0 ? (
+      {topics.length > 0 ? (
         <>
           <h2 className="section-title">Topics worked on</h2>
-          {episodes.map((episode) => (
-            <button className="topic-row" key={episode.id} onClick={onOpenEpisode}>
-              <div>
-                <div className="name">{episode.title}</div>
-                <div className="sub">{episode.firstAt.slice(0, 10)}</div>
-              </div>
-              <div className="figures-inline">
-                <b>{episode.foreground}</b> of {episode.count}
-              </div>
-              <div className="bar" title={`${episode.count} records`}>
-                <i
-                  style={{
-                    width: `${(episode.foreground / Math.max(1, episode.count)) * 100}%`,
-                    background: 'var(--accent)',
-                  }}
-                />
-                <i
-                  style={{
-                    width: `${((episode.count - episode.foreground) / Math.max(1, episode.count)) * 100}%`,
-                    background: 'var(--line-strong)',
-                  }}
-                />
-              </div>
-            </button>
-          ))}
+          <div className="rows">
+            {topics.map((topic) => (
+              <button
+                className="row"
+                key={topic.id}
+                style={tone('direction')}
+                disabled={topic.shown === 0}
+                onClick={() => onOpenTopic(topic.id)}
+              >
+                <div>
+                  <div className="name">{topic.title}</div>
+                  <div className="sub">{topic.firstAt.slice(0, 10)}</div>
+                </div>
+                <div className="amount">
+                  <b>{topic.shown}</b> / {topic.count}
+                </div>
+                <div className="spectrum">
+                  <i style={{ width: `${(topic.shown / Math.max(1, topic.count)) * 100}%` }} />
+                </div>
+              </button>
+            ))}
+          </div>
         </>
       ) : null}
     </>
-  );
-}
-
-function Figure({ n, label }: { n: number; label: string }): ReactElement {
-  return (
-    <div className="figure">
-      <div className="n">{n}</div>
-      <div className="l">{label}</div>
-    </div>
   );
 }

@@ -64,7 +64,9 @@ beforeEach(async () => {
   upsertRecords(db, [decision, discovery]);
   uiDir = await mkdtemp(join(tmpdir(), 'backstory-ui-'));
   await mkdir(join(uiDir, 'assets'), { recursive: true });
+  await mkdir(join(uiDir, 'fonts'), { recursive: true });
   await writeFile(join(uiDir, 'index.html'), '<!doctype html><div id="root"></div>', 'utf8');
+  await writeFile(join(uiDir, 'fonts', 'sample.woff2'), 'wOF2 not really', 'utf8');
 });
 
 afterEach(async () => {
@@ -231,5 +233,28 @@ describe('binding', () => {
     } finally {
       await explorer.close();
     }
+  });
+});
+
+/**
+ * The explorer serves its own typefaces so it needs no network. Fonts once fell
+ * through to the app-shell catch-all and came back as HTML, which no error
+ * surfaced: the interface simply rendered in a fallback face.
+ */
+describe('static assets', () => {
+  it('serves a font file rather than the app shell', async () => {
+    const app = createExplorerApp({ db, uiDir });
+    const response = await app.request('/fonts/sample.woff2');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type') ?? '').not.toContain('text/html');
+    expect(await response.text()).not.toContain('<div id="root">');
+  });
+
+  it('still serves the app shell for a deep link', async () => {
+    const app = createExplorerApp({ db, uiDir });
+    const response = await app.request('/some/deep/link');
+
+    expect(await response.text()).toContain('<div id="root">');
   });
 });

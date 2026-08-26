@@ -36,34 +36,29 @@ export function Search({ query }: { query: string }): ReactElement {
     return () => clearTimeout(timer);
   }, [query]);
 
-  if (query.trim().length < 2) {
-    return (
-      <div className="empty">
-        <h3>Search the record</h3>
-        <p>
-          Try a topic you half-remember deciding. Rejected options are searchable on their own, so
-          an approach you ruled out will surface even though nothing was built from it.
-        </p>
-      </div>
-    );
-  }
-
   if (searched && records.length === 0) {
     return (
       <div className="empty">
         <h3>Nothing matches “{query}”</h3>
-        <p>Only distilled records are searchable, not the raw sessions behind them.</p>
+        <p>
+          Backstory searches the records it wrote, not the raw session files behind them. Try a
+          different word, or clear the search to browse by topic.
+        </p>
+        <p>
+          Options you ruled out are searchable on their own, so an approach that was never built
+          can still be found by name.
+        </p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="filters">
-        <span className="who">
-          {records.length} {plural(records.length, 'result')} for “{query}”
-        </span>
-      </div>
+      {/* The same count line every other view uses, and readable by a screen
+          reader: it was hidden from one for no reason. */}
+      <p className="count">
+        {records.length} {plural(records.length, 'result')} for “{query}”
+      </p>
       {records.map((record) => (
         <RecordRow key={record.id} record={record} />
       ))}

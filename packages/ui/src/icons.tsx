@@ -43,3 +43,21 @@ export function ArrowRight({ size = 13 }: Props) {
     </svg>
   );
 }
+
+/** The option that was taken. */
+export function Check({ className, size = 14 }: Props) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M2.75 8.5L6.25 12l7-8" />
+    </svg>
+  );
+}
+
+/** An option that was not. */
+export function Cross({ className, size = 14 }: Props) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}

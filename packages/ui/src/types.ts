@@ -167,10 +167,14 @@ export function isForeground(record: MemoryRecord): boolean {
 export function attributionOf(record: MemoryRecord): string | null {
   if (record.type === 'decision') {
     const { proposedBy, acceptedBy } = record.attribution;
-    if (acceptedBy === 'implicit') return 'agent decided, no approval';
-    if (proposedBy.type === 'agent' && acceptedBy.type === 'human') return 'agent proposed, you accepted';
-    if (proposedBy.type === 'human' && acceptedBy.type === 'human') return 'you decided';
-    return `${proposedBy.type} to ${acceptedBy.type}`;
+    // Whoever raised it owns the call, so reading the proposer first covers
+    // every combination. The version that checked both sides had a fallback
+    // that printed its own field names: "agent to human".
+    if (proposedBy.type === 'human') return 'you decided';
+    if (acceptedBy !== 'implicit' && acceptedBy.type === 'human') {
+      return 'agent proposed, you accepted';
+    }
+    return 'agent decided, no approval';
   }
 
   if (record.type === 'question') return record.actor.type === 'human' ? 'you asked' : 'agent asked';

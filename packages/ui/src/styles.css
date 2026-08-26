@@ -1,1057 +1,1088 @@
 /*
- * Operate surface. The reader is answering "why is this like this?", so
- * scanning and hierarchy outrank expression. Brand lives in the details.
- *
- * One accent, used for the current selection and primary action only. Kind is
- * carried by a small set of hues that stay muted enough to sit in body text
- * without competing with it.
- */
+  Self-hosted, because PRODUCT.md promises the explorer "opens on localhost
+  with no account and no network". Linking Google Fonts made four third-party
+  requests every time a developer opened their own decision history, and told
+  Google they had done so.
 
-:root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --surface-sunken: #f4f4f2;
-  --line: #e4e4e1;
-  --line-strong: #d2d2ce;
-
-  --text: #1a1a18;
-  --text-soft: #5c5c56;
-  --text-faint: #8a8a82;
-
-  --accent: #2f5fd0;
-  --accent-soft: #eaf0fd;
-
-  --business: #7c3f00;
-  --business-bg: #fdf2e3;
-  --technical: #1f4f7a;
-  --technical-bg: #e8f1f8;
-  --direction: #5b3a86;
-  --direction-bg: #f2ecfa;
-  --working: #6b6b64;
-  --working-bg: #f0f0ed;
-
-  --taken: #17603a;
-  --taken-bg: #e6f4ec;
-  --dropped: #9a2f2f;
-  --dropped-bg: #fbeceb;
-
-  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-
-  --shadow-sm: 0 1px 2px rgba(20, 20, 16, 0.05), 0 1px 1px rgba(20, 20, 16, 0.03);
-  --shadow-md: 0 4px 12px rgba(20, 20, 16, 0.07), 0 1px 3px rgba(20, 20, 16, 0.05);
-  --shadow-lg: 0 12px 32px rgba(20, 20, 16, 0.1), 0 2px 8px rgba(20, 20, 16, 0.05);
+  latin and latin-ext only. The other four subsets Google serves would triple
+  the payload for languages this tool's sessions do not carry; text outside
+  these ranges falls back to the system stack and still reads.
+*/
+@font-face {
+  font-family: 'Commissioner';
+  font-style: normal;
+  font-weight: 200 600;
+  font-display: swap;
+  src: url('/fonts/commissioner-200-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Commissioner';
+  font-style: normal;
+  font-weight: 200 600;
+  font-display: swap;
+  src: url('/fonts/commissioner-200-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-:root:not([data-theme='light']) {
-  color-scheme: light;
+/*
+  Iridescence.
+
+  A newly formed cloud edge diffracts sunlight into a narrow fringe of mint,
+  rose and violet while the cloud body stays plain white. The rule that world
+  runs on is the rule this interface runs on: the text field is achromatic, and
+  colour is confined to a hairline at the edge. Nothing here is a card, a chip,
+  or a badge.
+
+  Day is the committed ground. Dusk keeps the same phenomenon on a dark sky,
+  where the fringe reads brighter rather than differently.
+*/
+
+:root {
+  --ground: #fcfcfa;
+  --sunk: #f5f5f2;
+  --ink: #22262c;
+  --ink-2: #565c64;
+  --ink-3: #6a7179;
+  --hair: #e6e6e1;
+  --hair-2: #d6d6d0;
+
+  --band-technical: #3f9a7c;
+  --band-business: #c25f7c;
+  --band-direction: #7a5cb8;
+  --band-working: #9aa0a7;
+
+  --focus: #7a5cb8;
+  --shadow: 0 18px 44px -28px rgb(34 38 44 / 45%);
+
+  --measure: 68ch;
+  --gutter: 168px;
+  --ease: cubic-bezier(0.22, 0.8, 0.28, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #131316;
-    --surface: #1a1a1e;
-    --surface-sunken: #101013;
-    --line: #2a2a30;
-    --line-strong: #3a3a42;
+    --ground: #14161a;
+    --sunk: #191c21;
+    --ink: #e6e9ec;
+    --ink-2: #adb4bc;
+    --ink-3: #939aa2;
+    --hair: #262a31;
+    --hair-2: #343a42;
 
-    --text: #ecece9;
-    --text-soft: #a3a3a0;
-    --text-faint: #75757a;
+    --band-technical: #63d0ac;
+    --band-business: #ef92b0;
+    --band-direction: #ab91e8;
+    --band-working: #6e757e;
 
-    --accent: #7ba3f5;
-    --accent-soft: #1c2740;
-
-    --business: #e0a86a;
-    --business-bg: #2a2016;
-    --technical: #7db8e0;
-    --technical-bg: #16242e;
-    --direction: #b596e0;
-    --direction-bg: #221a2e;
-    --working: #8f8f88;
-    --working-bg: #202024;
-
-    --taken: #5cc48d;
-    --taken-bg: #14261c;
-    --dropped: #e88b83;
-    --dropped-bg: #2a1817;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
-
-    color-scheme: dark;
+    --focus: #ab91e8;
+    --shadow: 0 18px 44px -28px rgb(0 0 0 / 80%);
   }
 }
 
-* {
+:root[data-theme='dark'] {
+  --ground: #14161a;
+  --sunk: #191c21;
+  --ink: #e6e9ec;
+  --ink-2: #adb4bc;
+  --ink-3: #939aa2;
+  --hair: #262a31;
+  --hair-2: #343a42;
+
+  --band-technical: #63d0ac;
+  --band-business: #ef92b0;
+  --band-direction: #ab91e8;
+  --band-working: #6e757e;
+
+  --focus: #ab91e8;
+  --shadow: 0 18px 44px -28px rgb(0 0 0 / 80%);
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  margin: 0;
   height: 100%;
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 14px;
-  line-height: 1.55;
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: Commissioner, 'Helvetica Neue', -apple-system, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-select {
+button {
   font: inherit;
   color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: var(--r-sm);
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
-/* ── shell ─────────────────────────────────────────────────────────── */
+code {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  color: var(--ink);
+}
+
+/* ─── shell ─────────────────────────────────────────────────────────────── */
 
 .shell {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* One container for the whole application. Every view sits on the same two
+   columns, so moving between them moves content and nothing else. */
+.wrap {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 40px;
 }
 
 .topbar {
+  border-bottom: 1px solid var(--hair);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--ground) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.bar {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 0 18px;
-  height: 52px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 34px;
+  padding-block: 26px 20px;
 }
 
 .wordmark {
-  font-weight: 640;
-  letter-spacing: -0.015em;
-  font-size: 15px;
-  white-space: nowrap;
-}
-
-.wordmark span {
-  color: var(--text-faint);
-  font-weight: 400;
-  margin-left: 9px;
-  font-size: 13px;
-}
-
-.tabs {
   display: flex;
-  gap: 2px;
-  background: var(--surface-sunken);
-  padding: 3px;
-  border-radius: var(--r-md);
+  flex-direction: column;
+  gap: 6px;
 }
 
-.tabs button {
-  border: 0;
-  background: none;
-  color: var(--text-soft);
-  padding: 5px 13px;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 13px;
+.wordmark h1 {
+  margin: 0;
+  font-size: 23px;
   font-weight: 500;
-  transition: color 150ms ease, background 150ms ease;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.tabs button:hover {
-  color: var(--text);
-}
-
-.tabs button[aria-current='true'] {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+.wordmark p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  color: var(--ink-2);
 }
 
 .omni {
-  margin-left: auto;
-  position: relative;
-  width: min(340px, 38vw);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 316px;
+  max-width: 48vw;
+  /* Vertical padding lives on the input, not here. On the container it was
+     thirteen dead pixels above and below the field: clicking there focused
+     nothing, so a 49px-tall box had a 23px target. */
+  padding: 0 12px;
+  border: 1px solid var(--hair-2);
+  border-radius: 2px;
+  color: var(--ink-3);
+  transition: border-color 0.2s var(--ease);
+}
+
+.omni:focus-within {
+  border-color: var(--ink-2);
 }
 
 .omni input {
-  width: 100%;
-  padding: 7px 12px 7px 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg);
-  font-size: 13px;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding-block: 12px;
+  padding-inline: 0;
+}
+
+.omni input::placeholder {
+  color: var(--ink-3);
+}
+
+/* The field itself carries the ring, since the input fills a bordered box and
+   an outline on the input would sit inside that border. */
+.omni:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .omni input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.omni svg {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  translate: 0 -50%;
-  color: var(--text-faint);
-  pointer-events: none;
+.omni input::-webkit-search-cancel-button {
+  appearance: none;
 }
 
-/* ── body layout ───────────────────────────────────────────────────── */
-
-.body {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  min-height: 0;
-  overflow: hidden;
-  align-items: stretch;
+.tabs {
+  display: flex;
+  gap: 26px;
 }
 
-.body.solo {
-  grid-template-columns: 1fr;
-}
-
-.rail {
-  border-right: 1px solid var(--line);
-  background: var(--surface-sunken);
-  overflow-y: auto;
-  padding: 14px 10px 24px;
-}
-
-.rail-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  padding: 0 8px 8px;
-}
-
-.rail button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: none;
-  padding: 7px 9px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  color: var(--text-soft);
-  font-size: 13px;
-  line-height: 1.35;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.rail button:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
-.rail button[aria-current='true'] {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 550;
-  box-shadow: var(--shadow-sm);
-}
-
-.rail .count {
-  float: right;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
+.tabs button {
+  position: relative;
+  padding-block: 11px 13px;
+  font-size: 14.5px;
   font-weight: 400;
+  color: var(--ink-3);
+  transition: color 0.2s var(--ease);
 }
 
-.main {
-  overflow-y: auto;
-  padding: 24px 32px 90px;
+.tabs button::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--ink);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
 }
 
-.main-inner {
-  max-width: 820px;
-  margin: 0 auto;
+.tabs button:hover {
+  color: var(--ink-2);
+}
+
+.tabs button[aria-current='true'] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tabs button[aria-current='true']::after {
+  opacity: 1;
+}
+
+/* ─── the two columns ────────────────────────────────────────────────────── */
+
+/*
+  Three tracks, the middle one a hairline. A rule drawn on the rail itself
+  would stop wherever the rail's content ran out; as its own track it spans
+  whichever column is taller, so the separation holds on every view.
+*/
+.split {
+  display: grid;
+  grid-template-columns: 244px 1px minmax(0, 1fr);
+  gap: 0 42px;
+  align-items: start;
+  flex: 1;
+  padding-block: 30px 90px;
+}
+
+.split::before {
+  content: '';
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+  background: var(--hair);
+}
+
+.side {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.content {
+  grid-column: 3;
+  grid-row: 1;
 }
 
 /*
- * Wide screens get a sticky outline beside the content rather than an empty
- * half. The outline is navigation, so the space earns its place.
- */
-.with-outline {
-  display: grid;
-  grid-template-columns: minmax(0, 720px) 210px;
-  gap: 0 40px;
-  align-items: start;
-  justify-content: center;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.with-outline > .stream {
-  min-width: 0;
-}
-
-.outline {
+  The rail scrolls with the page rather than inside itself. An inner scroller
+  put a second scrollbar down the middle of the window, and a control you have
+  to scroll a panel to reach is not a control that is always visible.
+*/
+.side {
   position: sticky;
-  top: 24px;
-  padding-top: 2px;
+  top: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
 }
 
-.outline a {
-  display: grid;
-  grid-template-columns: 1fr auto;
+.grp {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.grp .lbl {
+  display: flex;
+  align-items: baseline;
   gap: 8px;
-  padding: 5px 8px;
-  border-radius: var(--r-sm);
-  color: var(--text-soft);
-  text-decoration: none;
-  font-size: 12.5px;
-  line-height: 1.35;
-  transition: background 140ms ease, color 140ms ease;
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
-.outline a:hover {
-  background: var(--surface);
-  color: var(--text);
+.grp .blurb {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-2);
 }
 
-.outline a .n {
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 1120px) {
-  .with-outline {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 760px;
-  }
-  .outline {
-    display: none;
-  }
-}
-
-/* ── filters ───────────────────────────────────────────────────────── */
-
-.filters {
+.ck {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding-bottom: 16px;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--line);
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding-block: 12px;
+  font-size: 14.5px;
+  color: var(--ink-2);
+  transition: color 0.18s var(--ease);
 }
 
-.chip {
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  color: var(--text-soft);
-  padding: 4px 10px;
-  border-radius: 999px;
-  cursor: pointer;
+.ck .box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--hair-2);
+  border-radius: 2px;
+  color: transparent;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.ck:hover {
+  color: var(--ink);
+}
+
+.ck:hover .box {
+  border-color: var(--ink-3);
+}
+
+.ck[aria-checked='true'] {
+  color: var(--ink);
+}
+
+.ck[aria-checked='true'] .box {
+  background: var(--tone);
+  border-color: var(--tone);
+  color: #fff;
+}
+
+.ck .n,
+.tp .n {
+  margin-left: auto;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 12px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
-}
-
-.chip:hover {
-  border-color: var(--text-faint);
-  color: var(--text);
-}
-
-.chip[aria-pressed='true'] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.chip .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.chip .n {
   font-variant-numeric: tabular-nums;
-  opacity: 0.65;
+  color: var(--ink-3);
 }
 
-.filter-gap {
-  flex: 1;
-}
-
-.linkish {
-  border: 0;
+/* Appears once the list is long enough to need it, so a short project never
+   sees a control it has no use for. */
+.tp-find {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 11px 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
   background: none;
-  color: var(--text-soft);
-  cursor: pointer;
-  font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--line-strong);
-  padding: 4px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--hair);
+  transition: border-color 0.2s var(--ease);
 }
 
-.linkish:hover {
-  color: var(--text);
+.tp-find::placeholder {
+  color: var(--ink-3);
 }
 
-/* ── episode sections ──────────────────────────────────────────────── */
+/* Pointer focus keeps the quieter treatment: the ring is for people who cannot
+   see where they clicked. This rule comes first on purpose, because it has the
+   same specificity as the one below and would otherwise cancel it. */
+.tp-find:focus {
+  outline: none;
+  border-bottom-color: var(--ink-2);
+}
+
+.tp-find:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.tp-find::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.tp {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding-block: 13px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  transition: color 0.18s var(--ease);
+}
+
+.tp:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.tp[aria-current='true'] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tp:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.tp:disabled .n {
+  opacity: 0.6;
+}
+
+.fold {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  margin-top: 4px;
+  padding-block: 12px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  transition: color 0.18s var(--ease);
+}
+
+.fold span {
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.18s var(--ease);
+}
+
+.fold:hover {
+  color: var(--ink-2);
+}
+
+.fold:hover span {
+  border-bottom-color: var(--hair-2);
+}
+
+.side .none {
+  margin: 0;
+  padding-block: 10px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Announced, not shown: the content column prints the same count in view. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ─── the content column ─────────────────────────────────────────────────── */
+
+.content {
+  min-width: 0;
+  max-width: 840px;
+}
+
+.count {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+/* ─── the reading column ────────────────────────────────────────────────── */
 
 .episode {
-  margin-bottom: 30px;
+  margin-bottom: 8px;
 }
 
 .episode-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.episode-head h2 {
-  font-size: 14px;
-  font-weight: 620;
-  letter-spacing: -0.005em;
-  margin: 0;
-}
-
-.episode-head .meta {
-  font-size: 12px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  margin-left: auto;
-}
-
-.episode {
-  scroll-margin-top: 20px;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding-block: 28px 14px;
 }
 
 .episode-head .caret {
-  color: var(--text-faint);
-  transition: rotate 160ms ease;
-  margin-left: -4px;
+  color: var(--ink-3);
+  transition: transform 0.24s var(--ease);
+  flex: none;
+  align-self: center;
 }
 
 .episode-head[aria-expanded='false'] .caret {
-  rotate: -90deg;
+  transform: rotate(-90deg);
 }
 
-/* ── record ────────────────────────────────────────────────────────── */
-
-.record {
-  position: relative;
-  padding: 11px 0 11px 20px;
-  border-left: 1px solid var(--line);
-}
-
-.record::before {
-  content: '';
-  position: absolute;
-  left: -3.5px;
-  top: 19px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--line-strong);
-}
-
-.record[data-kind='business']::before {
-  background: var(--business);
-}
-.record[data-kind='technical']::before {
-  background: var(--technical);
-}
-.record[data-kind='direction']::before {
-  background: var(--direction);
-}
-
-.record-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 3px;
-}
-
-.tag {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.045em;
-  text-transform: uppercase;
-  padding: 1.5px 6px;
-  border-radius: 4px;
-  background: var(--working-bg);
-  color: var(--working);
-  white-space: nowrap;
-}
-
-.tag[data-kind='business'] {
-  background: var(--business-bg);
-  color: var(--business);
-}
-.tag[data-kind='technical'] {
-  background: var(--technical-bg);
-  color: var(--technical);
-}
-.tag[data-kind='direction'] {
-  background: var(--direction-bg);
-  color: var(--direction);
-}
-
-.who {
-  font-size: 11.5px;
-  color: var(--text-faint);
-}
-
-.time {
-  font-size: 11.5px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  margin-left: auto;
-}
-
-.record-head .spacer {
-  margin-left: auto;
-}
-
-/*
- * Weight separates a decision from everything around it. When every row was
- * bold the page had no shape, and the choice a reader came for looked like the
- * note beside it.
- */
-.record h3 {
-  margin: 0 0 3px;
-  font-size: 13.6px;
-  font-weight: 440;
-  line-height: 1.5;
-  letter-spacing: 0;
-  text-wrap: pretty;
-  color: var(--text);
-}
-
-.record[data-type='decision'] h3 {
-  font-size: 15px;
-  font-weight: 580;
-  letter-spacing: -0.011em;
-  line-height: 1.36;
-  margin-bottom: 1px;
-}
-
-.record[data-kind='working'] h3 {
-  color: var(--text-soft);
-  font-size: 13px;
-}
-
-.record .why {
-  color: var(--text-soft);
-  font-size: 13.2px;
+.episode-head h2 {
   margin: 0;
-  text-wrap: pretty;
-}
-
-.record .question-line {
-  color: var(--text-faint);
-  font-size: 12.5px;
-  margin: 0 0 2px;
-}
-
-.alts {
-  margin-top: 9px;
-  display: grid;
-  gap: 6px;
-}
-
-.alt {
-  background: var(--dropped-bg);
-  border-radius: var(--r-sm);
-  padding: 7px 10px;
-  font-size: 12.8px;
-}
-
-.alt .choice {
-  color: var(--dropped);
-  font-weight: 560;
-}
-
-.alt .reason {
-  color: var(--text-soft);
-}
-
-.alt .cond {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-faint);
-  font-size: 12px;
-}
-
-.files {
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--text-faint);
-  word-break: break-all;
-}
-
-/* ── working-detail disclosure ─────────────────────────────────────── */
-
-.working-toggle {
-  display: block;
-  width: 100%;
-  text-align: left;
-  margin: 4px 0 4px 18px;
-  padding: 6px 10px;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--r-sm);
-  background: none;
-  color: var(--text-faint);
-  cursor: pointer;
-  font-size: 12.3px;
-  transition: color 140ms ease, border-color 140ms ease;
-}
-
-.working-toggle:hover {
-  color: var(--text-soft);
-  border-color: var(--text-faint);
-}
-
-/* ── decision map ──────────────────────────────────────────────────── */
-
-.map {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 0;
-  min-height: 0;
-  height: auto;
-  overflow: hidden;
-}
-
-.map-list {
-  border-right: 1px solid var(--line);
-  overflow-y: auto;
-  padding: 12px 10px 40px;
-  background: var(--surface-sunken);
-}
-
-.map-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: none;
-  padding: 9px 10px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  margin-bottom: 2px;
-  transition: background 140ms ease;
-}
-
-.map-item:hover {
-  background: var(--surface);
-}
-
-.map-item[aria-current='true'] {
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.map-item .t {
-  font-size: 13px;
-  font-weight: 480;
-  line-height: 1.4;
-  display: block;
-  margin-bottom: 2px;
-  text-wrap: pretty;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.map-item[aria-current='true'] .t {
-  font-weight: 590;
-}
-
-.map-item .s {
-  font-size: 11.5px;
-  color: var(--text-faint);
-}
-
-.map-stage {
-  overflow-y: auto;
-  padding: 30px 34px 70px;
-  min-height: 0;
-}
-
-.map-stage-inner {
-  max-width: 660px;
-}
-
-.fork-question {
-  font-size: 12.5px;
-  color: var(--text-faint);
-  margin: 0 0 6px;
-}
-
-.fork-title {
-  font-size: 20px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-  margin: 0 0 10px;
-  line-height: 1.25;
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
   text-wrap: balance;
 }
 
-.branch {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--r-md);
-  margin-bottom: 8px;
-}
-
-.branch.taken {
-  background: var(--taken-bg);
-}
-
-.branch.dropped {
-  background: var(--dropped-bg);
-}
-
-.branch .mark {
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.branch.taken .mark {
-  color: var(--taken);
-}
-
-.branch.dropped .mark {
-  color: var(--dropped);
-}
-
-.branch .label {
-  font-weight: 570;
-  margin-bottom: 2px;
-  text-wrap: pretty;
-}
-
-.branch.taken .label {
-  color: var(--taken);
-}
-
-.branch.dropped .label {
-  color: var(--dropped);
-}
-
-.branch .detail {
-  color: var(--text-soft);
-  font-size: 13px;
-  text-wrap: pretty;
-}
-
-.branch .cond {
-  display: block;
-  margin-top: 5px;
-  font-size: 12.2px;
-  color: var(--text-faint);
-}
-
-/* ── overview ──────────────────────────────────────────────────────── */
-
-.figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  margin-bottom: 26px;
-}
-
-.figure {
-  background: var(--surface);
-  padding: 14px 16px;
-}
-
-.figure .n {
-  font-size: 24px;
-  font-weight: 620;
-  letter-spacing: -0.03em;
+.episode-head .meta {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  color: var(--ink-3);
+  white-space: nowrap;
 }
-
-.figure .l {
-  font-size: 12px;
-  color: var(--text-faint);
-  margin-top: 1px;
-}
-
-.section-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin: 0 0 12px;
-}
-
-.topic-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 120px;
-  gap: 16px;
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: none;
-  padding: 11px 6px;
-  cursor: pointer;
-  transition: background 140ms ease;
-}
-
-.topic-row .figures-inline {
-  font-size: 12.5px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.topic-row .figures-inline b {
-  color: var(--text);
-  font-weight: 580;
-}
-
-.topic-row:hover {
-  background: var(--surface);
-}
-
-.topic-row .name {
-  font-weight: 550;
-  font-size: 13.6px;
-}
-
-.topic-row .sub {
-  font-size: 12.3px;
-  color: var(--text-faint);
-  margin-top: 1px;
-}
-
-.bar {
-  display: flex;
-  height: 6px;
-  width: 100%;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--line);
-}
-
-.bar i {
-  display: block;
-  height: 100%;
-}
-
-/* ── states ────────────────────────────────────────────────────────── */
-
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-faint);
-  max-width: 420px;
-  margin: 0 auto;
-}
-
-.empty h3 {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 570;
-  margin: 0 0 6px;
-}
-
-.empty p {
-  margin: 0 0 14px;
-  font-size: 13.4px;
-  line-height: 1.6;
-}
-
-.empty code {
-  font-family: var(--mono);
-  font-size: 12.5px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 2px 7px;
-}
-
-.skeleton {
-  display: grid;
-  gap: 14px;
-  padding-top: 4px;
-}
-
-.skeleton i {
-  display: block;
-  height: 13px;
-  border-radius: 5px;
-  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--line) 50%, var(--surface-sunken) 75%);
-  background-size: 200% 100%;
-  animation: sweep 1.4s ease-in-out infinite;
-}
-
-@keyframes sweep {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* ── narrow ────────────────────────────────────────────────────────── */
-
-@media (max-width: 860px) {
-  .body,
-  .map {
-    grid-template-columns: 1fr;
-  }
-
-  .rail,
-  .map-list {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    max-height: 168px;
-  }
-
-  .topbar {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-    gap: 10px;
-  }
-
-  .omni {
-    margin-left: 0;
-    width: 100%;
-    order: 3;
-  }
-
-  .main {
-    padding: 16px 14px 60px;
-  }
-}
-
-/* ── the fork ──────────────────────────────────────────────────────── */
 
 /*
- * A decision is a fork, so it is drawn as one: every option in a single stack
- * with the taken one marked. Rendered as stacked paragraphs it was impossible
- * to tell what was asked from what was chosen.
- */
-.fork {
-  margin-top: 9px;
+  Attribution and time sit in the margin rather than stacked above the
+  question, so nothing stands between the reader and what was asked.
+*/
+.record {
   display: grid;
-  gap: 3px;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+}
+
+.record.dispersed h3 {
+  color: var(--ink-2);
+}
+
+/* Attention deepens the fringe, the way the bands intensify when the droplets
+   fall into size. One mark, not a mark plus a glow: at any zoom the blurred
+   second layer read as a rendering fault rather than as light. */
+.record-text::before {
+  opacity: 0.82;
+  transition: opacity 0.25s var(--ease);
+}
+
+.record:hover .record-text::before {
+  opacity: 1;
+}
+
+.record-margin {
+  padding: 26px 26px 26px 0;
+  text-align: right;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.record-margin .kind {
+  color: var(--ink-2);
+}
+
+.record-margin .when {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fringe: a 2px band with a soft bleed beside it, the way a diffracting
+   edge reads against the cloud body. */
+.record-text {
+  position: relative;
+  padding: 26px 0 40px 30px;
+}
+
+.record-text::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 26px;
+  bottom: 26px;
+  border-radius: 2px;
+  /* A fringe, not a rail: full colour at the edge where the record begins,
+     gone before the record ends, the way a diffracting boundary reads against
+     the cloud body. */
+  background: linear-gradient(
+    180deg,
+    var(--tone) 0%,
+    var(--tone) 14%,
+    color-mix(in srgb, var(--tone) 40%, transparent) 44%,
+    transparent 82%
+  );
+  width: 2px;
+}
+
+.record h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: -0.008em;
+  max-width: var(--measure);
+  text-wrap: balance;
+}
+
+.record .note {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+
+.record .files {
+  margin-top: 12px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+  word-break: break-all;
+}
+
+/* ─── the fork ──────────────────────────────────────────────────────────── */
+
+.opts {
+  margin-top: 18px;
+  max-width: var(--measure);
 }
 
 .opt {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 9px;
-  padding: 8px 11px;
-  border-radius: var(--r-sm);
-  font-size: 12.9px;
-}
-
-.opt.taken {
-  background: var(--taken-bg);
-}
-
-.opt.dropped {
-  background: var(--surface-sunken);
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  padding-block: 9px;
 }
 
 .opt .mark {
-  font-weight: 700;
-  font-size: 11.5px;
-  line-height: 1.62;
+  margin-top: 4px;
+  color: var(--ink-3);
 }
 
 .opt.taken .mark {
-  color: var(--taken);
-}
-
-.opt.dropped .mark {
-  color: var(--dropped);
+  color: var(--tone);
 }
 
 .opt .label {
-  font-weight: 570;
-  line-height: 1.4;
-  text-wrap: pretty;
-  margin-bottom: 1px;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink-2);
 }
 
 .opt.taken .label {
-  color: var(--taken);
-}
-
-.opt.dropped .label {
-  color: var(--text-soft);
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .opt .reason {
-  color: var(--text-soft);
-  line-height: 1.45;
-  text-wrap: pretty;
-}
-
-.opt.dropped .reason {
-  color: var(--text-faint);
+  margin-top: 2px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
 }
 
 .opt .cond {
-  margin-top: 4px;
-  color: var(--text-faint);
-  font-size: 12.2px;
+  margin-top: 5px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+  font-style: italic;
 }
 
-/* A harvested question is the full prompt as asked, which runs long. */
-.record[data-type='decision'] h3 {
-  font-size: 14.6px;
+.dropped-head {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--hair);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ─── decisions view ────────────────────────────────────────────────────── */
+
+/*
+  Decisions renders the same rows as the story, so it needs no layout of its
+  own. It differs in what it selects and how it orders: forks only, richest
+  first, ungrouped. The old two-pane picker was a third page shape for the
+  same content.
+*/
+/* ─── overview ──────────────────────────────────────────────────────────── */
+
+.lede {
+  margin: 0 0 46px;
+  font-size: 25px;
+  font-weight: 200;
+  line-height: 1.45;
+  letter-spacing: -0.014em;
+  color: var(--ink-2);
+  max-width: 36ch;
+  text-wrap: balance;
+}
+
+.lede b {
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.section-title {
+  margin: 0 0 18px;
+  font-size: 11.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.rows {
+  margin-bottom: 52px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 82px 168px;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  text-align: left;
+  padding-block: 15px;
+  border-top: 1px solid var(--hair);
+}
+
+button.row {
+  transition: opacity 0.18s var(--ease);
+}
+
+button.row:disabled {
+  cursor: default;
+}
+
+button.row:disabled .name,
+button.row:disabled .sub {
+  color: var(--ink-3);
+}
+
+button.row:hover:not(:disabled) .name,
+button.row:focus-visible .name {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--hair-2);
+}
+
+.row .name {
+  font-size: 16px;
+  font-weight: 400;
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  color: var(--ink-2);
+  transition: color 0.18s var(--ease);
+}
+
+.row .sub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.row .amount {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.row .amount b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* A spectrum, not a progress bar: the filled part carries the band's own
+   colour and the remainder stays as plain cloud. */
+.spectrum {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hair-2);
   overflow: hidden;
+  display: flex;
+}
+
+.spectrum i {
+  display: block;
+  height: 100%;
+  /* The filled part disperses toward its end rather than stopping flat, so the
+     bar is the same optical event as the fringe. */
+  background: linear-gradient(
+    90deg,
+    var(--tone, var(--ink-3)),
+    color-mix(in srgb, var(--tone, var(--ink-3)) 34%, transparent)
+  );
+}
+
+/* ─── states ────────────────────────────────────────────────────────────── */
+
+.empty {
+  padding: 64px 0;
+  max-width: 52ch;
+}
+
+.empty h3 {
+  margin: 0 0 10px;
+  font-size: 21px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+.empty p {
+  margin: 0 0 10px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.empty p:last-child {
+  margin-bottom: 0;
+}
+
+.empty .detail {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  word-break: break-word;
+}
+
+.skeleton {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: var(--measure);
+}
+
+.skeleton i {
+  display: block;
+  height: 12px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--hair) 0%,
+    var(--sunk) 42%,
+    var(--hair) 84%
+  );
+  background-size: 220% 100%;
+  animation: drift 1.5s var(--ease) infinite;
+}
+
+@keyframes drift {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ─── narrow ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1120px) {
+  .wrap {
+    padding-inline: 26px;
+  }
+
+  .split {
+    grid-template-columns: 214px 1px minmax(0, 1fr);
+    gap: 0 30px;
+  }
+}
+
+@media (max-width: 820px) {
+  .wrap {
+    padding-inline: 18px;
+  }
+
+  .bar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+    padding-block: 22px 16px;
+  }
+
+  .wordmark {
+    font-size: 20px;
+  }
+
+  .omni {
+    width: 100%;
+    max-width: none;
+  }
+
+  .tabs {
+    gap: 22px;
+  }
+
+  /* The rail unstacks above the column: every control stays one scroll away
+     rather than behind a button. */
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 30px;
+    padding-block: 22px 70px;
+  }
+
+  /* One column, so the rule has nothing to separate. The rail's own bottom
+     border does the job instead. */
+  .split::before {
+    display: none;
+  }
+
+  .side,
+  .content {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .side {
+    position: static;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .side .grp:has(.ck) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+  }
+
+  .side .grp:has(.ck) .lbl {
+    grid-column: 1 / -1;
+  }
+
+  /* Above the column, an empty topic is scroll the reader pays for before
+     reaching a record. They stay listed on wider screens, where the rail sits
+     beside the content and costs nothing. */
+  .tp:disabled {
+    display: none;
+  }
+
+  .record h3 {
+    font-size: 18px;
+  }
+
+  .record {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .record-margin {
+    order: 2;
+    text-align: left;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding: 0 0 26px 18px;
+  }
+
+  .record-text {
+    padding: 24px 0 12px 18px;
+  }
+
+  .record-text::before {
+    bottom: 0;
+    top: 24px;
+  }
+
+  .lede {
+    font-size: 21px;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 16px;
+  }
+
+  .spectrum {
+    grid-column: 1 / -1;
+  }
 }

@@ -1,4 +1,5 @@
 import { serve, type ServerType } from '@hono/node-server';
+import { compress } from 'hono/compress';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { IndexDatabase } from '@backstory/core';
 import { Hono } from 'hono';
@@ -23,10 +24,20 @@ export interface RunningExplorer {
 export function createExplorerApp(options: Pick<ExplorerOptions, 'db' | 'uiDir' | 'storeDir'>): Hono {
   const app = new Hono();
 
+  // The records endpoint returns the whole store in one response, and record
+  // text repeats heavily across a project's history. Measured on a 2020-record
+  // store: 1.8 MB uncompressed, 55 KB gzipped.
+  app.use('*', compress());
+
   app.route('/', createApi({ db: options.db, ...(options.storeDir ? { storeDir: options.storeDir } : {}) }));
 
   if (existsSync(options.uiDir)) {
     app.use('/assets/*', serveStatic({ root: options.uiDir }));
+    // Fonts are served from this machine, not from a CDN, so the explorer keeps
+    // its promise of opening with no network. Without this route they fell
+    // through to the shell below and came back as HTML, and the interface lost
+    // both typefaces without reporting anything.
+    app.use('/fonts/*', serveStatic({ root: options.uiDir }));
     // Any non-API path serves the app shell, so a deep link still loads.
     app.get('*', serveStatic({ path: 'index.html', root: options.uiDir }));
   } else {
