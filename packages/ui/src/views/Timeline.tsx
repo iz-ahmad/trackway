@@ -80,8 +80,11 @@ export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
 
   const hiddenWorking = counts['working'] ?? 0;
 
+  const outline = grouped.filter((group) => group.records.length > 0);
+
   return (
-    <>
+    <div className="with-outline">
+      <div className="stream">
       <div className="filters">
         {KINDS.map((kind) => (
           <button
@@ -122,7 +125,7 @@ export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
         const open = !collapsed.has(group.id);
 
         return (
-          <section className="episode" key={group.id}>
+          <section className="episode" key={group.id} id={`ep-${group.id}`}>
             <div
               className="episode-head"
               role="button"
@@ -139,7 +142,7 @@ export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
               <Caret className="caret" />
               <h2>{group.title}</h2>
               <span className="meta">
-                {group.records.length} {plural(group.records.length, 'record')}
+                {group.records.length} · {group.records[0]?.createdAt.slice(0, 10) ?? ''}
               </span>
             </div>
 
@@ -151,7 +154,20 @@ export function Timeline({ sessionId, onOpenDecision }: Props): ReactElement {
           </section>
         );
       })}
-    </>
+      </div>
+
+      {outline.length > 1 ? (
+        <nav className="outline" aria-label="Topics">
+          <div className="rail-label">Topics</div>
+          {outline.map((group) => (
+            <a key={group.id} href={`#ep-${group.id}`}>
+              <span>{group.title}</span>
+              <span className="n">{group.records.length}</span>
+            </a>
+          ))}
+        </nav>
+      ) : null}
+    </div>
   );
 }
 

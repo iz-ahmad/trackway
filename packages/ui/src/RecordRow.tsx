@@ -25,18 +25,21 @@ export function RecordRow({ record, onOpenDecision }: Props): ReactElement {
   const who = attributionOf(record);
 
   return (
-    <article className="record" data-kind={kind}>
+    <article className="record" data-kind={kind} data-type={record.type}>
       <div className="record-head">
+        {/*
+          One badge. Two said the same thing twice: a decision marked
+          "technical" is already visibly a decision, and the pair read as noise
+          in every row.
+
+          No per-record time either. Records distilled from one chunk all carry
+          that chunk's end timestamp, so a clock on each implies a precision the
+          data does not have. The date sits on the topic instead.
+        */}
         <span className="tag" data-kind={kind}>
-          {record.type === 'decision' ? 'decision' : record.type}
+          {record.type === 'decision' ? KIND_LABEL[kind] : record.type}
         </span>
-        {kind !== 'working' ? (
-          <span className="tag" data-kind={kind}>
-            {KIND_LABEL[kind]}
-          </span>
-        ) : null}
         {who ? <span className="who">{who}</span> : null}
-        <span className="time">{record.createdAt.slice(11, 16)}</span>
       </div>
 
       {record.type === 'decision' ? (

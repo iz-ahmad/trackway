@@ -57,6 +57,9 @@ export function History({ onOpenEpisode }: { onOpenEpisode: () => void }): React
               </div>
               <div className="sub">{KIND_BLURB[kind]}</div>
             </div>
+            <div className="figures-inline">
+              <b>{byKind[kind] ?? 0}</b> of {counts.records}
+            </div>
             <div className="bar" title={`${byKind[kind] ?? 0} records`}>
               <i
                 style={{
@@ -76,10 +79,10 @@ export function History({ onOpenEpisode }: { onOpenEpisode: () => void }): React
             <button className="topic-row" key={episode.id} onClick={onOpenEpisode}>
               <div>
                 <div className="name">{episode.title}</div>
-                <div className="sub">
-                  {episode.foreground} worth reading of {episode.count}{' '}
-                  {plural(episode.count, 'record')}
-                </div>
+                <div className="sub">{episode.firstAt.slice(0, 10)}</div>
+              </div>
+              <div className="figures-inline">
+                <b>{episode.foreground}</b> of {episode.count}
               </div>
               <div className="bar" title={`${episode.count} records`}>
                 <i

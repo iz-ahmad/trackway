@@ -38,8 +38,15 @@ export function DecisionMap({ focusId, onFocus }: Props): ReactElement {
   if (error) return <Problem detail={error} />;
   if (decisions === null) return <Loading />;
 
-  const shown = decisions.filter((decision) => showWorking || isForeground(decision));
+  // Ordered by how much each fork records, so the list agrees with the stage
+  // and the first thing a reader sees is a real choice with its alternatives.
+  const shown = decisions
+    .filter((decision) => showWorking || isForeground(decision))
+    .sort((a, b) => b.alternatives.length - a.alternatives.length);
   const workingCount = decisions.length - decisions.filter(isForeground).length;
+  // Landing on a decision with no alternatives shows an empty stage and teaches
+  // the reader nothing, so the list is ordered richest first and the stage
+  // follows it.
   const focused = shown.find((d) => d.id === focusId) ?? shown[0] ?? null;
 
   if (decisions.length === 0) {
@@ -107,7 +114,7 @@ function Fork({ decision }: { decision: DecisionRecord }): ReactElement {
       <div className="branch taken">
         <span className="mark">✓</span>
         <div>
-          <div className="label">{decision.choice}</div>
+          <div className="label">Taken</div>
           <div className="detail">{decision.reason}</div>
         </div>
       </div>
