@@ -198,7 +198,7 @@ backstory ingest chat.json
 
 ### Getting the accurate path
 
-Distillation is model-extracted and measured at precision 0.57. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
+Distillation is model-extracted and measured at precision 0.54, recall 0.91. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
 
 Emit a tool entry named `AskUserQuestion`, `ask_question` or `request_user_input` whose input carries an option list, and the question, every option and each option's own reasoning are taken exactly as written, with no model involved:
 
@@ -241,14 +241,19 @@ Two paths, two very different answers. Conflating them would flatter the tool.
 
 **Harvested forks: deterministic.** Read verbatim from structured tool input. There is nothing to be accurate about; the data is the data. 186 forks across 485 sessions, all classified, none unresolved.
 
-**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list, that list is ground truth with no hand labelling. Across 485 sessions, 165 forks were recorded and resolved, and each is one known decision point.
+**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list and somebody answers it, that is ground truth with no hand labelling. Across 485 sessions there are 165 such decision points.
 
-Measured across 7 sessions of 15 to 260 events: **precision 0.57, recall 0.68, F1 0.62**.
+Measured across 6 sessions of 1 to 26 decision points: **precision 0.54, recall 0.91, F1 0.68**.
 
-Read that scope carefully:
+The previous figure was 0.57 / 0.68 / 0.62. Recall moved because the answer key was wrong, not because extraction improved. It counted every option list ever shown as a decision to be found, including 23 of 188 that were dismissed without an answer, so recall could never pass 0.88. Those are gone; what is left is a key of decisions that were actually made.
 
-- **Recall on large sessions is unmeasured.** An earlier run scored recall 0.06 and 0.11 on sessions of 17 and 27 decision points, because the extractor capped each session at 200 events and silently ignored the rest. Chunking fixed the cap and full coverage is verified directly, but the recall it produces on a long session has not been measured, because those sessions cost 13 model calls each.
-- **Precision near 0.57** means roughly two in five extracted records are not in the answer key. Some are real extractions the key does not contain, since the key only covers decisions recorded as an explicit option list. Others are noise. The four-kind filter hides most of it, but that is concealment, not accuracy.
+Read the rest carefully:
+
+- **Precision fell slightly, and that is the honest direction.** Removing phantom expectations shrinks the key without shrinking what the extractor produces, so the surplus shows up as false positives. Roughly two in five extracted records are not in the key. Some are real decisions the key cannot contain, since it only covers those recorded as an explicit option list. Others are noise.
+- **A seventh session was scored and is missing.** Its distillation timed out at five minutes. It is excluded rather than counted as a zero, and the timeout is a real limit rather than a measurement artefact.
+- **Larger sessions are still the weak spot.** The largest scored had 26 decision points at recall 1.00, but the next largest at 17 scored 0.71. Sessions with far more than that remain unmeasured, because each costs around thirteen model calls and the run above took forty-five minutes.
+
+Scoring matches on the question. The key now also records which option was taken, which it previously discarded, so grading whether the extractor found the right *choice* rather than merely the right fork is possible and not yet done.
 
 Nothing gates a release on these numbers, by design. Suppressing a useful record to protect a score is the wrong trade.
 
