@@ -12,5 +12,8 @@
     "@backstory/core": "*",
     "zod": "^4.0.0",
     "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@backstory/distill": "*"
   }
 }

@@ -1,4 +1,4 @@
-import { defaultRegistry } from '@backstory/adapters';
+import { defaultRegistry, parseTranscript } from '@backstory/adapters';
 import {
   attributeToPeople,
   commitsBetween,
@@ -100,7 +100,7 @@ async function runSync(workspace: Workspace, options: SyncOptions): Promise<Sync
  * someone installed it; matching a record's own timestamp against the log links
  * everything already in the repository, so a first run is useful immediately.
  */
-async function linkAndAttribute(
+export async function linkAndAttribute(
   workspace: Workspace,
   records: readonly MemoryRecord[],
 ): Promise<MemoryRecord[]> {
@@ -152,4 +152,49 @@ export async function persist(
   }
 
   return { written, skipped: results.length - written };
+}
+
+export interface IngestResult {
+  sessionId: string;
+  agent: string;
+  events: number;
+  records: number;
+  written: number;
+}
+
+/**
+ * Reads one transcript in and treats it exactly like a session found on disk.
+ *
+ * The way in for an agent nobody has written an adapter for. Every adapter so
+ * far reads a store somebody else designed, which means support waits on
+ * reverse-engineering a format and on having that agent installed to verify
+ * against. A documented shape anyone can produce needs neither.
+ *
+ * Nothing downstream is special-cased. The same distiller runs, the same fork
+ * harvesting reads recorded option lists verbatim, the same linking attaches
+ * commits, and the same records come out.
+ */
+export async function ingestTranscript(
+  workspace: Workspace,
+  input: unknown,
+  options: { now?: () => Date } = {},
+): Promise<IngestResult> {
+  const { descriptor, events } = parseTranscript(input);
+
+  const distill = createDistiller({
+    runner: new ClaudeDistillRunner(),
+    ...(options.now === undefined ? {} : { now: options.now }),
+  });
+
+  const distilled = (await distill({ descriptor, events, fromOffset: 0 })) ?? [];
+  const records = await linkAndAttribute(workspace, distilled);
+  const { written } = await persist(workspace, records);
+
+  return {
+    sessionId: descriptor.sessionId,
+    agent: descriptor.sessionFile.split(':')[1] ?? 'unknown',
+    events: events.length,
+    records: records.length,
+    written,
+  };
 }

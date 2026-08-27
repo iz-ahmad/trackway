@@ -94,6 +94,7 @@ Work with your agent normally. There are no commands to run during a session.
 
 ```bash
 backstory sync                                 # distil sessions that have gone quiet
+backstory why src/limit.ts 42                  # what was decided that produced this line
 backstory search "why is cancellation async"   # search everything
 backstory rejected --about caching             # options you dropped, and why
 backstory decisions --actor human              # decisions you made, not the agent
@@ -116,6 +117,8 @@ Full reference:
 | --- | --- |
 | `backstory init` | set up the current repository |
 | `backstory sync` | distil sessions that have gone quiet |
+| `backstory ingest [file]` | read a transcript from any agent, from a file or stdin |
+| `backstory why <file> [line]` | what was decided that produced this line, and what was rejected |
 | `backstory status` | what is stored, which agents were found, what is pending |
 | `backstory search <query>` | full-text search across every record |
 | `backstory rejected [query]` | options considered and not taken |
@@ -164,9 +167,59 @@ Credential redaction is best effort. A secret shaped like ordinary prose will ge
 
 OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
 
-**Cursor is not supported yet.** Its chat history lives in an undocumented SQLite database, and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason, so it waits for a machine that can test it.
+**Cursor has no adapter yet.** Its chat history lives in an undocumented SQLite database and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason. Until then, `backstory ingest` takes it, and anything else.
 
-Adding an agent means writing a parser behind one interface. Nothing in the core changes.
+Adding a first-class adapter means writing a parser behind one interface. Nothing in the core changes.
+
+## Any other agent
+
+Every adapter above reads a store somebody else designed, so support waits on reverse-engineering a format and on owning a machine with that agent installed. `backstory ingest` needs neither. Pipe it a transcript and it becomes records like any session found on disk: same distillation, same fork harvesting, same commit linking.
+
+```bash
+cat chat.json | backstory ingest
+backstory ingest chat.json
+```
+
+```json
+{
+  "agent": "cursor",
+  "sessionId": "composer-9f3a",
+  "cwd": "/path/to/repo",
+  "startedAt": "2026-08-27T10:00:00Z",
+  "entries": [
+    { "role": "user", "text": "We need rate limiting on the public API." },
+    { "role": "assistant", "text": "Added middleware with a Redis token bucket." },
+    { "role": "tool", "name": "Edit", "input": { "path": "src/limit.ts" }, "output": "ok" }
+  ]
+}
+```
+
+`agent` and `sessionId` are required; `sessionId` makes re-ingesting the same conversation a no-op rather than a duplicate. Every entry may carry its own `at`, and one without inherits the last seen. Credentials are redacted here exactly as they are on a session file.
+
+### Getting the accurate path
+
+Distillation is model-extracted and measured at precision 0.57. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
+
+Emit a tool entry named `AskUserQuestion`, `ask_question` or `request_user_input` whose input carries an option list, and the question, every option and each option's own reasoning are taken exactly as written, with no model involved:
+
+```json
+{
+  "role": "tool",
+  "name": "AskUserQuestion",
+  "input": {
+    "questions": [{
+      "question": "Where should rate limiting live?",
+      "options": [
+        { "label": "At the edge, in the CDN", "description": "No app code, but no per-user quota." },
+        { "label": "Middleware in the app", "description": "Per-user quota. Costs a Redis round trip." }
+      ]
+    }]
+  },
+  "output": "The user answered: \"Where should rate limiting live?\"=\"Middleware in the app\""
+}
+```
+
+That produces a decision carrying the option taken and both rejected ones with their reasons. If the answer names none of the options, it is recorded as an answer the developer wrote themselves with every option rejected. If the question was dismissed, it is recorded as an open question rather than a decision nobody made.
 
 ## For agents
 

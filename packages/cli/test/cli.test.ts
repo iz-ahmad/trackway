@@ -11,6 +11,7 @@ import {
   findRepoRoot,
   forgetCommand,
   hookCommand,
+  ingestCommand,
   hookTargets,
   installHook,
   isHookInstalled,
@@ -638,5 +639,49 @@ describe('tracing a line back to the decision behind it', () => {
 
     expect(await whyCommand('cache.ts', '1', {}, io)).toBe(1);
     expect(io.errors.join('\n')).toContain('backstory sync');
+  });
+});
+
+describe('ingesting a transcript from an agent with no adapter', () => {
+  const transcript = {
+    agent: 'cursor',
+    sessionId: 'composer-1',
+    startedAt: '2026-08-27T10:00:00Z',
+    entries: [{ role: 'user', text: 'Add rate limiting.' }],
+  };
+
+  it('refuses a file that is not JSON, saying so', async () => {
+    await writeFile(join(repo, 'bad.json'), 'not json at all', 'utf8');
+    const io = captureIo();
+
+    expect(await ingestCommand(join(repo, 'bad.json'), {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('not JSON');
+  });
+
+  it('refuses an empty file rather than recording an empty session', async () => {
+    await writeFile(join(repo, 'empty.json'), '   ', 'utf8');
+    const io = captureIo();
+
+    expect(await ingestCommand(join(repo, 'empty.json'), {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('empty');
+  });
+
+  it('names the field that is wrong, and points at the documented shape', async () => {
+    await writeFile(
+      join(repo, 'wrong.json'),
+      JSON.stringify({ ...transcript, entries: [{ role: 'sorcerer', text: 'x' }] }),
+      'utf8',
+    );
+    const io = captureIo();
+
+    expect(await ingestCommand(join(repo, 'wrong.json'), {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('README');
+  });
+
+  it('says which file it could not read', async () => {
+    const io = captureIo();
+
+    expect(await ingestCommand(join(repo, 'absent.json'), {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('absent.json');
   });
 });

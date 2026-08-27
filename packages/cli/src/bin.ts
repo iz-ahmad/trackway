@@ -9,6 +9,7 @@ import {
   initCommand,
   mcpCommand,
   rebuildCommand,
+  ingestCommand,
   rejectedCommand,
   whyCommand,
   searchCommand,
@@ -59,6 +60,12 @@ async function main(): Promise<void> {
     .option('--json', 'machine-readable output')
     .option('--no-sync', 'do not catch up before searching')
     .action(async (query, options) => process.exit(await searchCommand(query, options, consoleIo)));
+
+  program
+    .command('ingest [file]')
+    .description('read a transcript from any agent, from a file or stdin')
+    .option('--json', 'machine-readable output')
+    .action(async (file, options) => process.exit(await ingestCommand(file, options, consoleIo)));
 
   program
     .command('why <file> [line]')

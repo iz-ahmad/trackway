@@ -7,3 +7,4 @@ export * from './claude-code/adapter.js';
 export * from './codex/adapter.js';
 export * from './opencode/adapter.js';
 export * from './defaults.js';
+export * from './transcript/parse.js';

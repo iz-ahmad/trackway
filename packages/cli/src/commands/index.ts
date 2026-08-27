@@ -1,4 +1,5 @@
-import { defaultRegistry } from '@backstory/adapters';
+import { readFile } from 'node:fs/promises';
+import { InvalidTranscriptError, defaultRegistry } from '@backstory/adapters';
 import {
   BackstoryConfig,
   blameLine,
@@ -22,7 +23,7 @@ import {
 import { loadState } from '@backstory/distill';
 import { alternativeLine, detail, oneLine, shortDate, truncate } from '../format.js';
 import { hookCommand, hookTargets, installHook, isHookInstalled } from '../hook.js';
-import { sync } from '../pipeline.js';
+import { ingestTranscript, sync } from '../pipeline.js';
 import {
   ensureIgnoreRules,
   loadWorkspace,
@@ -605,4 +606,81 @@ export async function whyCommand(
     io.out('');
   }
   return 0;
+}
+
+/**
+ * Reads a transcript from a file or from stdin.
+ *
+ * The way in for an agent with no adapter. Documented in the README so anyone
+ * can produce it from a shell script, and refused with the offending field
+ * rather than half-read when it is wrong.
+ */
+export async function ingestCommand(
+  file: string | undefined,
+  options: { json?: boolean },
+  io: Io = consoleIo,
+): Promise<number> {
+  const workspace = await requireWorkspace(io);
+  if (!workspace) return 1;
+
+  let raw: string;
+  try {
+    raw = file === undefined ? await readStdin() : await readFile(file, 'utf8');
+  } catch (cause) {
+    io.err(
+      file === undefined
+        ? 'Nothing arrived on stdin. Pipe a transcript in, or pass a file.'
+        : `Could not read ${file}: ${(cause as Error).message}`,
+    );
+    return 1;
+  }
+
+  if (raw.trim().length === 0) {
+    io.err('The transcript is empty.');
+    return 1;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (cause) {
+    io.err(`That is not JSON: ${(cause as Error).message}`);
+    return 1;
+  }
+
+  try {
+    const result = await ingestTranscript(workspace, parsed);
+
+    if (options.json) {
+      io.out(JSON.stringify(result, null, 2));
+      return 0;
+    }
+
+    io.out(
+      `Read ${result.events} events from ${result.agent} session ${result.sessionId}.`,
+    );
+    io.out(
+      result.written === 0
+        ? 'Nothing new: these records were already stored.'
+        : `Wrote ${result.written} record${result.written === 1 ? '' : 's'}.`,
+    );
+    return 0;
+  } catch (cause) {
+    if (cause instanceof InvalidTranscriptError) {
+      io.err(cause.message);
+      io.err('The expected shape is documented under "Any other agent" in the README.');
+      return 1;
+    }
+    io.err(`Could not distil that transcript: ${(cause as Error).message}`);
+    return 1;
+  }
+}
+
+/** Reads all of stdin, refusing rather than hanging when it is a terminal. */
+async function readStdin(): Promise<string> {
+  if (process.stdin.isTTY) throw new Error('stdin is a terminal');
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8');
 }
