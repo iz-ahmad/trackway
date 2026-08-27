@@ -117,23 +117,19 @@ describe('parsing a real captured Codex session', () => {
 });
 
 // Covers AE7.
-describe('an adapter that cannot distill', () => {
-  it('declares no distillation capability', () => {
-    expect(new CodexAdapter().capabilities.canDistill).toBe(false);
-  });
-
-  it('still ingests and lists sessions', async () => {
+describe('ingesting and distilling', () => {
+  it('ingests and lists sessions', async () => {
     const descriptors = await adapterOver(FIXTURES).listSessions();
     expect(descriptors).toHaveLength(1);
   });
 
-  it('surfaces the limitation through status rather than as an error', async () => {
+  it('reports itself as usable through status', async () => {
     const registry = new AdapterRegistry([adapterOver(FIXTURES)]);
 
     const [status] = await registry.status();
 
     expect(status?.available).toBe(true);
-    expect(status?.canDistill).toBe(false);
+    expect(status?.canDistill).toBe(true);
     expect(status?.reason).toBeUndefined();
   });
 });
@@ -171,5 +167,14 @@ describe('availability and refusal', () => {
 
     expect(await adapter.listSessions({ repoRoot: '/Users/dev/fixture-repo' })).toHaveLength(1);
     expect(await adapter.listSessions({ repoRoot: '/Users/dev/elsewhere' })).toHaveLength(0);
+  });
+});
+
+describe('capabilities', () => {
+  it('distils, because distillation never invokes the agent that wrote the session', () => {
+    // Shipped disabled on the reasoning that the Codex CLI could not be driven
+    // non-interactively. True, and unrelated: the developer's own agent reads
+    // the events. Verified on a real rollout before enabling.
+    expect(new CodexAdapter().capabilities.canDistill).toBe(true);
   });
 });

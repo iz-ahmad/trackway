@@ -34,16 +34,21 @@ export interface CodexOptions {
  * File-backed, like Claude Code, but with a different entry vocabulary:
  * session_meta, turn_context, response_item, and event_msg.
  *
- * Ships without distillation. The Codex CLI was not installed on the machine
- * this was built against, so its non-interactive invocation could not be
- * verified. Claiming a capability we have not exercised would fail at the worst
- * possible moment, mid-sweep. Sessions still ingest and index.
+ * Distils like any other adapter. This shipped disabled on the reasoning that
+ * the Codex CLI could not be driven non-interactively, which was true and
+ * beside the point: distillation runs the developer's own agent over the
+ * events, and never invokes the agent that produced them. Nothing about a
+ * Codex session needs Codex to read it.
+ *
+ * Verified before enabling, because the original caution was right that an
+ * unexercised capability fails mid-sweep: a 28-event rollout distilled through
+ * the real pipeline and produced valid records.
  */
 export class CodexAdapter implements SessionAdapter {
   readonly id = ADAPTER_ID;
 
   readonly capabilities: AdapterCapabilities = {
-    canDistill: false,
+    canDistill: true,
     suppliesRedaction: false,
     supportsHook: false,
   };
