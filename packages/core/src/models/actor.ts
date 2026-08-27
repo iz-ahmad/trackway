@@ -6,7 +6,17 @@ import { z } from 'zod';
  */
 export const ActorRef = z.strictObject({
   type: z.enum(['human', 'agent']),
+  /**
+   * Stable key. For a human this is `human:<email>` where an email is known,
+   * and `human:local` where it is not, which is what every record written
+   * before authorship existed still carries.
+   */
   id: z.string().min(1),
+  /**
+   * How to address them on screen. "You" is only true for one reader, and a
+   * project has more than one developer in it.
+   */
+  name: z.string().min(1).optional(),
 });
 
 /**

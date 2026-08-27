@@ -183,6 +183,7 @@ export function toRecords(text: string, provenance: Provenance): MemoryRecord[] 
   const base = {
     sessionId: provenance.sessionId,
     episodeId: null,
+    commits: [],
     createdAt: provenance.createdAt,
     source,
   };

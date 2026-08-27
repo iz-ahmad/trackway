@@ -11,3 +11,5 @@ export * from './index/build.js';
 export * from './search/query.js';
 export * from './errors/isolate.js';
 export * from './store/episodes.js';
+export * from './git/repo.js';
+export * from './git/link.js';

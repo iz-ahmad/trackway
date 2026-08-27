@@ -10,6 +10,7 @@ import {
   mcpCommand,
   rebuildCommand,
   rejectedCommand,
+  whyCommand,
   searchCommand,
   sessionsCommand,
   showCommand,
@@ -58,6 +59,16 @@ async function main(): Promise<void> {
     .option('--json', 'machine-readable output')
     .option('--no-sync', 'do not catch up before searching')
     .action(async (query, options) => process.exit(await searchCommand(query, options, consoleIo)));
+
+  program
+    .command('why <file> [line]')
+    .description('what was decided that produced this line, and what was rejected')
+    .option('-n, --limit <n>', 'maximum records', Number)
+    .option('--all', 'include the agent\'s working notes')
+    .option('--json', 'machine-readable output')
+    .action(async (file, line, options) =>
+      process.exit(await whyCommand(file, line, options, consoleIo)),
+    );
 
   program
     .command('rejected [query]')

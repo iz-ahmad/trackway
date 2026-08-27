@@ -19,6 +19,7 @@ const decision: MemoryRecord = {
   type: 'decision',
   sessionId: 'ses-1',
   episodeId: null,
+  commits: [],
   significance: 'technical',
   createdAt: '2026-06-12T09:18:00Z',
   source: {
@@ -211,6 +212,7 @@ describe('how a record reads to an agent', () => {
       type: 'question',
       sessionId: 'ses-1',
       episodeId: null,
+      commits: [],
       significance: 'technical',
       createdAt: '2026-06-12T09:00:00Z',
       source: decision.source,

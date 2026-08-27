@@ -105,6 +105,23 @@ export function RecordRow({ record, muted = false }: Props): ReactElement {
         {record.type === 'action' && record.files.length > 0 ? (
           <div className="files">{record.files.join('  ')}</div>
         ) : null}
+
+        {/*
+          What this decision turned into. Matched from the record's own time
+          window against the repository's history, so it works on commits made
+          long before Backstory was installed.
+        */}
+        {record.commits.length > 0 ? (
+          <div className="commits">
+            <span className="lbl">Shipped in</span>
+            {record.commits.map((commit) => (
+              <span className="commit" key={commit.sha} title={`${commit.author} · ${commit.authoredAt.slice(0, 10)}`}>
+                <code>{commit.sha.slice(0, 8)}</code>
+                {commit.subject}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </article>
   );

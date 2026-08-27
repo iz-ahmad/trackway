@@ -46,6 +46,7 @@ function forkToRecord(
   const common = {
     sessionId,
     episodeId: null,
+    commits: [],
     createdAt: fork.timestamp,
     source,
   };

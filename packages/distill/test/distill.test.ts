@@ -648,6 +648,7 @@ describe('collapsing records that say the same thing twice', () => {
       type: 'decision' as const,
       sessionId: 'ses-1',
       episodeId: null,
+      commits: [],
       significance: 'technical' as const,
       createdAt: '2026-08-25T09:00:00Z',
       source: {
@@ -756,6 +757,7 @@ describe('identity across re-distillation', () => {
       type: 'decision' as const,
       sessionId: 'ses-1',
       episodeId: null,
+      commits: [],
       significance: 'technical' as const,
       createdAt: '2026-08-25T09:00:00Z',
       source: {

@@ -1,3 +1,4 @@
+import { describeActor } from '../src/format.js';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,6 +23,7 @@ import {
   statusCommand,
   sessionsCommand,
   showCommand,
+  whyCommand,
   writeConfig,
   type Io,
 } from '../src/index.js';
@@ -44,6 +46,7 @@ function decisionRecord(overrides: Partial<Extract<MemoryRecord, { type: 'decisi
     type: 'decision' as const,
     sessionId: 'ses-1',
     episodeId: null,
+    commits: [],
     createdAt: '2026-08-25T09:18:00Z',
     significance: 'technical' as const,
     source: {
@@ -302,7 +305,7 @@ describe('reading commands', () => {
 
     expect(output).toContain('Which cache should we use?');
     expect(output).toContain('Not taken:');
-    expect(output).toContain('AGENT, you accepted');
+    expect(output).toContain('AGENT, YOU accepted');
   });
 
   it('reports a missing record with a non-zero exit', async () => {
@@ -506,5 +509,134 @@ describe('when the index and the files disagree', () => {
     ]);
 
     expect(result.written).toBe(1);
+  });
+});
+
+describe('naming people rather than saying "you"', () => {
+  it('names the person who accepted, when the record knows one', () => {
+    const named = decisionRecord({
+      attribution: {
+        proposedBy: { type: 'agent', id: 'agent:claude-code' },
+        acceptedBy: { type: 'human', id: 'human:ada@example.com', name: 'Ada Lovelace' },
+      },
+    });
+
+    expect(describeActor(named as MemoryRecord)).toBe('AGENT, Ada Lovelace accepted');
+  });
+
+  it('names the person who directed the work', () => {
+    const named = decisionRecord({
+      attribution: {
+        proposedBy: { type: 'human', id: 'human:ada@example.com', name: 'Ada Lovelace' },
+        acceptedBy: { type: 'human', id: 'human:ada@example.com', name: 'Ada Lovelace' },
+      },
+    });
+
+    expect(describeActor(named as MemoryRecord)).toBe('Ada Lovelace');
+  });
+
+  it('falls back to "you" for records written before authorship existed', () => {
+    expect(describeActor(decisionRecord() as MemoryRecord)).toBe('AGENT, YOU accepted');
+  });
+});
+
+describe('tracing a line back to the decision behind it', () => {
+  async function commitFile(name: string, body: string, message: string): Promise<string> {
+    await writeFile(join(repo, name), body, 'utf8');
+    await run('git', ['add', name], { cwd: repo });
+    await run('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.com', 'commit', '-q', '-m', message], { cwd: repo });
+    const { stdout } = await run('git', ['rev-parse', 'HEAD'], { cwd: repo });
+    return stdout.trim();
+  }
+
+  async function seedLinked(sha: string, overrides = {}): Promise<void> {
+    const workspace = await loadWorkspace(repo);
+    await persist(workspace!, [
+      decisionRecord({
+        commits: [
+          {
+            sha,
+            subject: 'add the cache',
+            authoredAt: '2026-08-25T09:30:00Z',
+            author: 'Ada',
+            authorEmail: 'ada@example.com',
+          },
+        ],
+        ...overrides,
+      }) as MemoryRecord,
+    ]);
+  }
+
+  it('answers with the decision that produced the line', async () => {
+    const sha = await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    await seedLinked(sha);
+    const io = captureIo();
+
+    const code = await whyCommand('cache.ts', '1', {}, io);
+
+    expect(code).toBe(0);
+    expect(io.lines.join('\n')).toContain('Which cache should we use?');
+  });
+
+  it('shows what was rejected, which is the point of asking', async () => {
+    const sha = await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    await seedLinked(sha);
+    const io = captureIo();
+
+    await whyCommand('cache.ts', '1', {}, io);
+
+    expect(io.lines.join('\n')).toContain('PostgreSQL unlogged tables');
+  });
+
+  it('covers the whole file when no line is given', async () => {
+    const sha = await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    await seedLinked(sha);
+    const io = captureIo();
+
+    expect(await whyCommand('cache.ts', undefined, {}, io)).toBe(0);
+  });
+
+  it('hides working notes, and says how many it hid', async () => {
+    const sha = await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    await seedLinked(sha, { significance: 'working' as const });
+    const io = captureIo();
+
+    const code = await whyCommand('cache.ts', '1', {}, io);
+
+    expect(code).toBe(1);
+    expect(io.errors.join('\n')).toContain('--all');
+  });
+
+  it('shows them when asked', async () => {
+    const sha = await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    await seedLinked(sha, { significance: 'working' as const });
+    const io = captureIo();
+
+    expect(await whyCommand('cache.ts', '1', { all: true }, io)).toBe(0);
+  });
+
+  it('refuses a line number that is not one', async () => {
+    await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    const io = captureIo();
+
+    expect(await whyCommand('cache.ts', 'seven', {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('not a line number');
+  });
+
+  it('says the line is unattributable rather than pretending otherwise', async () => {
+    await commitFile('other.ts', 'x\n', 'unrelated');
+    await writeFile(join(repo, 'fresh.ts'), 'never committed\n', 'utf8');
+    const io = captureIo();
+
+    expect(await whyCommand('fresh.ts', '1', {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toMatch(/cannot attribute|no commits/i);
+  });
+
+  it('points at sync when the commit exists but nothing was distilled', async () => {
+    await commitFile('cache.ts', 'const ttl = 60;\n', 'add the cache');
+    const io = captureIo();
+
+    expect(await whyCommand('cache.ts', '1', {}, io)).toBe(1);
+    expect(io.errors.join('\n')).toContain('backstory sync');
   });
 });

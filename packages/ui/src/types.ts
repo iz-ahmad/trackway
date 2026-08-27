@@ -20,6 +20,17 @@ export const KIND_BLURB: Record<Significance, string> = {
 export interface ActorRef {
   type: 'human' | 'agent';
   id: string;
+  /** Present once a commit named them. Absent on records written before that. */
+  name?: string;
+}
+
+/** A commit this record's work produced. */
+export interface CommitRef {
+  sha: string;
+  subject: string;
+  authoredAt: string;
+  author: string;
+  authorEmail: string;
 }
 
 export interface Alternative {
@@ -35,6 +46,7 @@ interface BaseRecord {
   episodeId: string | null;
   createdAt: string;
   significance: Significance;
+  commits: CommitRef[];
 }
 
 export interface QuestionRecord extends BaseRecord {
@@ -170,13 +182,27 @@ export function attributionOf(record: MemoryRecord): string | null {
     // Whoever raised it owns the call, so reading the proposer first covers
     // every combination. The version that checked both sides had a fallback
     // that printed its own field names: "agent to human".
-    if (proposedBy.type === 'human') return 'you decided';
+    if (proposedBy.type === 'human') return `${who(proposedBy)} decided`;
     if (acceptedBy !== 'implicit' && acceptedBy.type === 'human') {
-      return 'agent proposed, you accepted';
+      return `agent proposed, ${who(acceptedBy)} accepted`;
     }
     return 'agent decided, no approval';
   }
 
-  if (record.type === 'question') return record.actor.type === 'human' ? 'you asked' : 'agent asked';
+  if (record.type === 'question') {
+    return record.actor.type === 'human' ? `${who(record.actor)} asked` : 'agent asked';
+  }
   return null;
+}
+
+/**
+ * How to name a person.
+ *
+ * "You" is only true for whoever is reading. Several developers share a
+ * project and their records share a store, so a name is used wherever one was
+ * recorded. Records from before authorship existed carry none, and those keep
+ * saying "you" rather than naming somebody the record never identified.
+ */
+function who(actor: ActorRef): string {
+  return actor.name ?? 'you';
 }

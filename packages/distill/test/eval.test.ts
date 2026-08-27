@@ -47,6 +47,7 @@ function decision(question: string, choice: string): MemoryRecord {
     type: 'decision',
     sessionId: 'ses-1',
     episodeId: null,
+    commits: [],
     significance: 'technical',
     createdAt: '2026-08-25T09:00:00Z',
     source: {
@@ -230,6 +231,7 @@ describe('scoring', () => {
       type: 'discovery',
       sessionId: 'ses-1',
       episodeId: null,
+      commits: [],
       significance: 'technical',
       createdAt: '2026-08-25T09:00:00Z',
       source: {

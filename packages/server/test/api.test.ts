@@ -13,6 +13,7 @@ const decision: MemoryRecord = {
   type: 'decision',
   sessionId: 'ses-1',
   episodeId: null,
+  commits: [],
   significance: 'technical',
   createdAt: '2026-08-25T09:18:00Z',
   source: {
@@ -47,6 +48,7 @@ const discovery: MemoryRecord = {
   type: 'discovery',
   sessionId: 'ses-1',
   episodeId: null,
+  commits: [],
   significance: 'technical',
   createdAt: '2026-08-25T09:10:00Z',
   source: {

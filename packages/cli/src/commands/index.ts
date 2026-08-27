@@ -1,16 +1,22 @@
 import { defaultRegistry } from '@backstory/adapters';
 import {
   BackstoryConfig,
+  blameLine,
+  commitBySha,
+  commitsTouching,
+  FOREGROUND_SIGNIFICANCE,
   forgetRecord,
-  readAllRecords,
   forgetSession,
   getRecord,
+  isRepository,
   listRecords,
   listSessions,
+  readAllRecords,
   rebuildIndex,
   removeRecord,
   search,
   searchAlternatives,
+  type MemoryRecord,
   type RecordType,
 } from '@backstory/core';
 import { loadState } from '@backstory/distill';
@@ -492,4 +498,111 @@ export async function rebuildCommand(_options: unknown, io: Io = consoleIo): Pro
   } finally {
     db.close();
   }
+}
+
+/**
+ * Why is this line like this.
+ *
+ * The question people actually ask, and the one a decision record is worst at
+ * answering on its own: you are looking at code, not at a topic. Blame gives
+ * the commit, the commit gives the records whose work produced it, and those
+ * records give the options that were on the table when it was written.
+ *
+ * Retroactive, like the linking behind it. Nothing had to be installed before
+ * the commit was made.
+ */
+/** Decisions answer the question being asked; everything else is context. */
+const WHY_ORDER: Record<RecordType, number> = {
+  decision: 0,
+  question: 1,
+  discovery: 2,
+  outcome: 3,
+  action: 4,
+};
+
+function rank(record: MemoryRecord): number {
+  return WHY_ORDER[record.type];
+}
+
+export async function whyCommand(
+  file: string,
+  line: string | undefined,
+  options: { json?: boolean; limit?: number; all?: boolean },
+  io: Io = consoleIo,
+): Promise<number> {
+  const workspace = await requireWorkspace(io);
+  if (!workspace) return 1;
+
+  if (!(await isRepository(workspace.repoRoot))) {
+    io.err('Not a git repository, so there are no commits to trace back from.');
+    return 1;
+  }
+
+  const lineNumber = line === undefined ? undefined : Number(line);
+  if (lineNumber !== undefined && (!Number.isInteger(lineNumber) || lineNumber < 1)) {
+    io.err(`"${line}" is not a line number.`);
+    return 1;
+  }
+
+  const shas =
+    lineNumber === undefined
+      ? await commitsTouching(workspace.repoRoot, file)
+      : await blameLine(workspace.repoRoot, file, lineNumber).then((sha) => (sha ? [sha] : []));
+
+  if (shas.length === 0) {
+    io.err(
+      lineNumber === undefined
+        ? `Git has no commits for ${file}.`
+        : `Git cannot attribute ${file}:${lineNumber}. The line may be uncommitted.`,
+    );
+    return 1;
+  }
+
+  const wanted = new Set(shas);
+  const { records } = await readAllRecords(workspace.recordsDir);
+
+  const covering = records.filter((record) =>
+    record.commits.some((commit) => wanted.has(commit.sha)),
+  );
+
+  // Somebody pointing at a line wants the decision behind it, not the note
+  // that a file was edited. Working detail is available behind --all.
+  const relevant = options.all
+    ? covering
+    : covering.filter((record) =>
+        (FOREGROUND_SIGNIFICANCE as readonly string[]).includes(record.significance),
+      );
+
+  const hits = relevant
+    .sort((a, b) => rank(a) - rank(b) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, options.limit ?? 10);
+
+  if (options.json) {
+    io.out(JSON.stringify({ file, line: lineNumber ?? null, commits: shas, records: hits }, null, 2));
+    return 0;
+  }
+
+  if (hits.length === 0) {
+    const commit = await commitBySha(workspace.repoRoot, shas[shas.length - 1]!);
+    io.err(
+      `No ${options.all ? 'record' : 'decision or discovery'} covers ${file}${lineNumber === undefined ? '' : `:${lineNumber}`}.` +
+        (commit ? ` Blames to ${commit.sha.slice(0, 8)} by ${commit.author}: ${commit.subject}` : ''),
+    );
+    io.err(
+      covering.length > 0
+        ? `Run again with --all to see the ${covering.length} working record${covering.length === 1 ? '' : 's'} that do.`
+        : 'Run `backstory sync` if that session has not been distilled yet.',
+    );
+    return 1;
+  }
+
+  io.out(
+    `${file}${lineNumber === undefined ? '' : `:${lineNumber}`} — ${hits.length} record${hits.length === 1 ? '' : 's'}`,
+  );
+  io.out('');
+  for (const record of hits) {
+    io.out(detail(record));
+    io.out('');
+  }
+  return 0;
 }

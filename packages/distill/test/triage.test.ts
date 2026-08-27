@@ -8,6 +8,7 @@ function discovery(id: string, text: string, significance = 'technical' as const
     type: 'discovery',
     sessionId: 'ses-1',
     episodeId: null,
+    commits: [],
     significance,
     createdAt: '2026-08-26T09:00:00Z',
     source: {

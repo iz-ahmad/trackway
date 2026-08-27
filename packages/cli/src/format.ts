@@ -23,16 +23,30 @@ export function shortTime(iso: string): string {
  * agent simply proceeding, is the thing the product promises to keep straight,
  * so it is spelled out rather than abbreviated.
  */
+/**
+ * How to address a person on screen.
+ *
+ * "You" is only true for one reader. A project has several developers in it and
+ * their records end up in the same store, so a name is used wherever the record
+ * carries one. Records written before authorship existed carry `human:local`
+ * and no name, and those still read as "you" rather than inventing somebody.
+ */
+function personName(actor: { id: string; name?: string | undefined }): string {
+  return actor.name ?? 'YOU';
+}
+
 export function describeActor(record: MemoryRecord): string {
   if (record.type === 'decision') {
     const { proposedBy, acceptedBy } = record.attribution;
     if (acceptedBy === 'implicit') return 'AGENT, no explicit approval';
-    if (proposedBy.type === 'agent' && acceptedBy.type === 'human') return 'AGENT, you accepted';
-    if (proposedBy.type === 'human') return 'YOU';
-    return `${proposedBy.type.toUpperCase()} to ${acceptedBy.type.toUpperCase()}`;
+    if (proposedBy.type === 'human') return personName(proposedBy);
+    if (acceptedBy.type === 'human') return `AGENT, ${personName(acceptedBy)} accepted`;
+    return 'AGENT';
   }
 
-  if (record.type === 'question') return record.actor.type === 'human' ? 'YOU' : 'AGENT';
+  if (record.type === 'question') {
+    return record.actor.type === 'human' ? personName(record.actor) : 'AGENT';
+  }
   return '';
 }
 

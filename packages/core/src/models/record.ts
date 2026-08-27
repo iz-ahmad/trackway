@@ -59,12 +59,38 @@ export const Alternative = z.strictObject({
   condition: z.string().nullable(),
 });
 
+/**
+ * A commit this record's work produced.
+ *
+ * Enough of the commit is copied in for the record to read on its own. A record
+ * is a markdown file someone opens in a diff, and a bare hash tells them
+ * nothing without a second command.
+ */
+export const CommitRef = z.strictObject({
+  sha: z.string().min(7),
+  subject: z.string(),
+  authoredAt: z.iso.datetime({ offset: true }),
+  author: z.string().min(1),
+  authorEmail: z.string(),
+});
+
 const base = {
   id: z.string().min(1),
   sessionId: z.string().min(1),
   episodeId: z.string().nullable(),
   createdAt: z.iso.datetime({ offset: true }),
   source: RecordSource,
+  /**
+   * Commits this record's work produced, attached after the fact by matching
+   * the record's time window against the repository's history.
+   *
+   * Deliberately not part of a record's identity, for the same reason
+   * `episodeId` is not: it arrives later, and a record whose ID changed when it
+   * gained a commit would break every reference to it.
+   *
+   * Defaults to empty so records written before linking existed still parse.
+   */
+  commits: z.array(CommitRef).default([]),
   /**
    * Defaults to `working` so an unclassified record is demoted rather than
    * promoted. Wrongly foregrounding noise costs more than wrongly hiding
@@ -116,6 +142,8 @@ export const OutcomeRecord = z.strictObject({
   text: z.string().min(1),
   result: z.enum(['passed', 'failed', 'unresolved']),
 });
+
+export type CommitRef = z.infer<typeof CommitRef>;
 
 export const MemoryRecord = z.discriminatedUnion('type', [
   QuestionRecord,
