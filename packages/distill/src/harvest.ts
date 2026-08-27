@@ -1,4 +1,4 @@
-import type { Alternative, MemoryEvent } from '@backstory/core';
+import type { Alternative, MemoryEvent } from '@trackway/core';
 
 /**
  * A decision point the session recorded literally, options and all.

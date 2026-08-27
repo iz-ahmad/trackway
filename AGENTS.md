@@ -1,12 +1,12 @@
-# Working on Backstory
+# Working on Trackway
 
 Instructions for coding agents and people working in this repository.
 
 ## What this is
 
-Backstory reads the session files coding agents write to disk and turns them into git-tracked records of decisions, discoveries, questions, and the options that were rejected.
+Trackway reads the session files coding agents write to disk and turns them into git-tracked records of decisions, discoveries, questions, and the options that were rejected.
 
-If this repository has a `.backstory/records/` directory, the reasoning behind past choices is in there. Check it before proposing an approach, especially before re-proposing something. `backstory rejected <topic>` lists what was already ruled out and why.
+If this repository has a `.trackway/records/` directory, the reasoning behind past choices is in there. Check it before proposing an approach, especially before re-proposing something. `trackway rejected <topic>` lists what was already ruled out and why.
 
 ## Layout
 
@@ -30,7 +30,7 @@ cli  ──> distill ──> adapters ──> core
 
 These exist because breaking them causes a specific failure. Each is covered by a test.
 
-**Nothing may throw into a coding session.** Backstory runs beside the developer's agent and, with a hook installed, inside its lifecycle. Every entry point returns a fallback. `isolate()` in core exists for this.
+**Nothing may throw into a coding session.** Trackway runs beside the developer's agent and, with a hook installed, inside its lifecycle. Every entry point returns a fallback. `isolate()` in core exists for this.
 
 **Record identity is content-derived and narrow.** A record's ID hashes its source region, type, and subject, and nothing else. Adding a mutable field to the identity core means superseding a decision changes its own ID and breaks every reference to it.
 
@@ -66,6 +66,6 @@ npm run typecheck  # strict, covers sources and tests
 
 ## Measuring extraction
 
-`backstory eval` scores the extractor against sessions that recorded their own option lists. Run it after changing the prompt. It reports and does not gate: suppressing a useful record to protect a score is the wrong trade.
+`trackway eval` scores the extractor against sessions that recorded their own option lists. Run it after changing the prompt. It reports and does not gate: suppressing a useful record to protect a score is the wrong trade.
 
 Matching is judged by a model rather than by word overlap. Overlap was tried and cannot recognise a reworded extraction, which is what good extraction produces.

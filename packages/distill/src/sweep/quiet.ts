@@ -1,4 +1,4 @@
-import type { SessionDescriptor } from '@backstory/core';
+import type { SessionDescriptor } from '@trackway/core';
 import { resolve } from 'node:path';
 import type { SweepState } from './state.js';
 import { stateKey } from './state.js';

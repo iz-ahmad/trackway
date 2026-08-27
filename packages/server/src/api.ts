@@ -11,7 +11,7 @@ import {
   type IndexDatabase,
   type MemoryRecord,
   type Significance,
-} from '@backstory/core';
+} from '@trackway/core';
 import { Hono } from 'hono';
 
 export interface ApiOptions {

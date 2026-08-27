@@ -1,5 +1,5 @@
-import { AdapterRegistry, type AdapterCapabilities, type SessionAdapter } from '@backstory/adapters';
-import type { MemoryEvent, MemoryRecord, SessionDescriptor } from '@backstory/core';
+import { AdapterRegistry, type AdapterCapabilities, type SessionAdapter } from '@trackway/adapters';
+import type { MemoryEvent, MemoryRecord, SessionDescriptor } from '@trackway/core';
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,7 +22,7 @@ const minutesAgo = (n: number) => new Date(NOW.getTime() - n * 60_000).toISOStri
 let cacheDir: string;
 
 beforeEach(async () => {
-  cacheDir = await mkdtemp(join(tmpdir(), 'backstory-sweep-'));
+  cacheDir = await mkdtemp(join(tmpdir(), 'trackway-sweep-'));
 });
 
 afterEach(async () => {

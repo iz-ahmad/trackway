@@ -1,4 +1,4 @@
-import { MemoryEvent as MemoryEventSchema } from '@backstory/core';
+import { MemoryEvent as MemoryEventSchema } from '@trackway/core';
 import Database from 'better-sqlite3';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -87,7 +87,7 @@ function buildDatabase(path: string, options: { includeTables?: boolean } = {}):
 }
 
 beforeEach(async () => {
-  scratch = await mkdtemp(join(tmpdir(), 'backstory-oc-'));
+  scratch = await mkdtemp(join(tmpdir(), 'trackway-oc-'));
   dbPath = join(scratch, 'opencode.db');
   buildDatabase(dbPath);
 });

@@ -1,4 +1,4 @@
-import { Transcript, type MemoryEvent, type SessionDescriptor } from '@backstory/core';
+import { Transcript, type MemoryEvent, type SessionDescriptor } from '@trackway/core';
 import { sanitize } from '../redact/index.js';
 
 export const ADAPTER_ID = 'transcript';

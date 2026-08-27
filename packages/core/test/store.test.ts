@@ -20,7 +20,7 @@ import { makeDecision, makeDiscovery } from './helpers/records.js';
 let storeDir: string;
 
 beforeEach(async () => {
-  storeDir = await mkdtemp(join(tmpdir(), 'backstory-store-'));
+  storeDir = await mkdtemp(join(tmpdir(), 'trackway-store-'));
 });
 
 afterEach(async () => {

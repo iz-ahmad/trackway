@@ -1,5 +1,5 @@
 {
-  "name": "@backstory/distill",
+  "name": "@trackway/distill",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": "./dist/index.js" },
   "dependencies": {
-    "@backstory/adapters": "*",
-    "@backstory/core": "*",
+    "@trackway/adapters": "*",
+    "@trackway/core": "*",
     "zod": "^4.0.0"
   }
 }

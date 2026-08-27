@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-export const HOOK_MARKER = 'backstory sync';
+export const HOOK_MARKER = 'trackway sync';
 
 export interface HookTarget {
   agent: string;
@@ -85,5 +85,5 @@ export async function isHookInstalled(target: HookTarget): Promise<boolean> {
 
 /** The command the hook runs. Detached and silent, so it cannot block a session. */
 export function hookCommand(): string {
-  return 'backstory sync --quiet &';
+  return 'trackway sync --quiet &';
 }

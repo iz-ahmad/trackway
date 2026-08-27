@@ -1,4 +1,4 @@
-import type { MemoryRecord } from '@backstory/core';
+import type { MemoryRecord } from '@trackway/core';
 
 /**
  * Above this overlap, two records of the same type are describing the same

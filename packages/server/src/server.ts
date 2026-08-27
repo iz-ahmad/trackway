@@ -1,7 +1,7 @@
 import { serve, type ServerType } from '@hono/node-server';
 import { compress } from 'hono/compress';
 import { serveStatic } from '@hono/node-server/serve-static';
-import type { IndexDatabase } from '@backstory/core';
+import type { IndexDatabase } from '@trackway/core';
 import { Hono } from 'hono';
 import { existsSync } from 'node:fs';
 import { createApi } from './api.js';

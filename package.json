@@ -1,5 +1,5 @@
 {
-  "name": "backstory-workspace",
+  "name": "trackway-workspace",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc --build && npm run build --workspace @backstory/ui",
+    "build": "tsc --build && npm run build --workspace @trackway/ui",
     "typecheck": "tsc --build --force && tsc -p tsconfig.test.json && tsc -p packages/ui/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"

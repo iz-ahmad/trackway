@@ -1,4 +1,4 @@
-import type { MemoryRecord } from '@backstory/core';
+import type { MemoryRecord } from '@trackway/core';
 import type { ExpectedDecision } from './ground-truth.js';
 
 export interface Scores {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Who did a thing. Backstory must never claim a human approved something they
+ * Who did a thing. Trackway must never claim a human approved something they
  * never saw, so attribution is modelled explicitly rather than inferred.
  */
 export const ActorRef = z.strictObject({

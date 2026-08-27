@@ -1,4 +1,4 @@
-import type { MemoryEvent } from '@backstory/core';
+import type { MemoryEvent } from '@trackway/core';
 import { harvestForks } from '../harvest.js';
 
 /**

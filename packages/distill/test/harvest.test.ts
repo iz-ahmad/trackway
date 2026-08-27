@@ -1,4 +1,4 @@
-import type { MemoryEvent } from '@backstory/core';
+import type { MemoryEvent } from '@trackway/core';
 import { describe, expect, it } from 'vitest';
 import { describeForksForPrompt, forkAlternatives, harvestForks } from '../src/index.js';
 

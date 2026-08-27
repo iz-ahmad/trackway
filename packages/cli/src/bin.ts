@@ -29,14 +29,14 @@ async function main(): Promise<void> {
   const program = new Command();
 
   program
-    .name('backstory')
+    .name('trackway')
     .description('The history behind your code.')
     .version('0.1.0')
     .showHelpAfterError();
 
   program
     .command('init')
-    .description('set up Backstory in this repository')
+    .description('set up Trackway in this repository')
     .option('--no-hook', 'skip installing the agent hook')
     .action(async (options) => process.exit(await initCommand(options, consoleIo)));
 
@@ -143,6 +143,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`backstory: ${String(error instanceof Error ? error.message : error)}\n`);
+  process.stderr.write(`trackway: ${String(error instanceof Error ? error.message : error)}\n`);
   process.exit(1);
 });

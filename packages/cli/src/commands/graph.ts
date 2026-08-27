@@ -1,4 +1,4 @@
-import { startExplorer } from '@backstory/server';
+import { startExplorer } from '@trackway/server';
 import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

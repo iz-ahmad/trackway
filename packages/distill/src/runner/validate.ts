@@ -1,4 +1,4 @@
-import { DistillationResult, type MemoryRecord, flattenResult, withDerivedId } from '@backstory/core';
+import { DistillationResult, type MemoryRecord, flattenResult, withDerivedId } from '@trackway/core';
 import { z } from 'zod';
 
 /**

@@ -1,11 +1,11 @@
-import { ClaudeCodeAdapter } from '@backstory/adapters';
+import { ClaudeCodeAdapter } from '@trackway/adapters';
 import {
   ClaudeDistillRunner,
   createDistiller,
   createJudge,
   runEval,
   summarize,
-} from '@backstory/distill';
+} from '@trackway/distill';
 import type { Io } from './index.js';
 
 export interface EvalCommandOptions {

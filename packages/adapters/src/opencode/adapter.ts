@@ -1,4 +1,4 @@
-import type { EventType, MemoryEvent, SessionDescriptor } from '@backstory/core';
+import type { EventType, MemoryEvent, SessionDescriptor } from '@trackway/core';
 import Database from 'better-sqlite3';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';

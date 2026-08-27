@@ -8,13 +8,13 @@ web
 
 ## Users
 
-A working software developer who uses a coding agent daily and runs Backstory on their own machine, in their own repository. They are alone, in a terminal and a browser, mid-project. Not a team lead reviewing others, not a manager reading reports.
+A working software developer who uses a coding agent daily and runs Trackway on their own machine, in their own repository. They are alone, in a terminal and a browser, mid-project. Not a team lead reviewing others, not a manager reading reports.
 
 The moment they open it: they have hit code whose shape they do not remember choosing, or they are about to propose an approach and want to know whether it was already ruled out. Days to weeks after the decision, not years.
 
 ## Product Purpose
 
-Coding agents write every session to disk. The reasoning behind a decision is in there, along with hundreds of other sessions, with no way to search it. Backstory reads those files and turns them into a small, git-tracked, searchable record of what was asked, what was considered, what was chosen, and why.
+Coding agents write every session to disk. The reasoning behind a decision is in there, along with hundreds of other sessions, with no way to search it. Trackway reads those files and turns them into a small, git-tracked, searchable record of what was asked, what was considered, what was chosen, and why.
 
 Success is a developer answering "why is this like this?" faster from the record than by scrolling a transcript or reading the code.
 
@@ -48,7 +48,7 @@ Extraction quality is measured, not gated: precision 0.57, recall 0.68 on sessio
 
 ## Brand Commitments
 
-Name: **Backstory**. Positioning line: "the history behind your code."
+Name: **Trackway**. Positioning line: "the history behind your code."
 
 Prose avoids em dashes and comma-stacked sentences, in the interface as well as the documentation.
 

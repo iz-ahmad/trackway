@@ -1,4 +1,4 @@
-import type { EventType, MemoryEvent, SessionDescriptor } from '@backstory/core';
+import type { EventType, MemoryEvent, SessionDescriptor } from '@trackway/core';
 import { createReadStream, type Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';

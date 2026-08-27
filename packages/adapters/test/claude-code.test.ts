@@ -1,4 +1,4 @@
-import { MemoryEvent as MemoryEventSchema } from '@backstory/core';
+import { MemoryEvent as MemoryEventSchema } from '@trackway/core';
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -26,7 +26,7 @@ const SECRET_SENTINEL = 'https://ci-deploy:PLANTED-CREDENTIAL@internal.example.t
 let scratch: string;
 
 beforeEach(async () => {
-  scratch = await mkdtemp(join(tmpdir(), 'backstory-cc-'));
+  scratch = await mkdtemp(join(tmpdir(), 'trackway-cc-'));
 });
 
 afterEach(async () => {

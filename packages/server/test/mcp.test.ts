@@ -1,4 +1,4 @@
-import { openIndex, upsertRecords, type IndexDatabase, type MemoryRecord } from '@backstory/core';
+import { openIndex, upsertRecords, type IndexDatabase, type MemoryRecord } from '@trackway/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

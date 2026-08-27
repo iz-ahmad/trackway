@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ActionRecord,
   Attribution,
-  BackstoryConfig,
+  TrackwayConfig,
   DecisionRecord,
   DistillationResult,
   EventType,
@@ -277,22 +277,22 @@ describe('DistillationResult', () => {
   });
 });
 
-describe('BackstoryConfig', () => {
+describe('TrackwayConfig', () => {
   it('supplies defaults for every field', () => {
     const config = defaultConfig();
 
-    expect(config.storePath).toBe('.backstory');
+    expect(config.storePath).toBe('.trackway');
     expect(config.quietWindowMinutes).toBe(15);
     expect(config.cacheRetentionDays).toBe(30);
     expect(config.adapters).toEqual(['claude-code', 'codex', 'opencode']);
   });
 
   it('rejects a non-positive quiet window', () => {
-    expect(BackstoryConfig.safeParse({ quietWindowMinutes: 0 }).success).toBe(false);
+    expect(TrackwayConfig.safeParse({ quietWindowMinutes: 0 }).success).toBe(false);
   });
 
   it('rejects an unknown config key rather than ignoring it', () => {
-    expect(BackstoryConfig.safeParse({ quietWindowMinutes: 5, verbose: true }).success).toBe(false);
+    expect(TrackwayConfig.safeParse({ quietWindowMinutes: 5, verbose: true }).success).toBe(false);
   });
 });
 

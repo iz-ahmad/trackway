@@ -1,4 +1,4 @@
-import type { AlternativeHit, MemoryRecord } from '@backstory/core';
+import type { AlternativeHit, MemoryRecord } from '@trackway/core';
 
 const TYPE_LABEL: Record<MemoryRecord['type'], string> = {
   question: 'QUESTION',

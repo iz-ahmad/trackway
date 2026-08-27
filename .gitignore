@@ -3,9 +3,9 @@ docs/plans/
 docs/brainstorms/
 engineering-memory-v1-spec.md
 
-# Backstory's own output. It reads this repository's sessions like any other,
+# Trackway's own output. It reads this repository's sessions like any other,
 # and the records it writes are this project's working notes, not its source.
-.backstory/
+.trackway/
 
 # Dependencies and build output
 node_modules/

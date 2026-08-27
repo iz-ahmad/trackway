@@ -1,5 +1,5 @@
 ---
-name: Backstory
+name: Trackway
 description: The history behind your code
 colors:
   cloud-white: "#fcfcfa"
@@ -84,7 +84,7 @@ components:
     padding: "5px 0"
 ---
 
-# Design System: Backstory
+# Design System: Trackway
 
 ## Overview
 

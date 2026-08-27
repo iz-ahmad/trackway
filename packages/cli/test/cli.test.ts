@@ -28,7 +28,7 @@ import {
   writeConfig,
   type Io,
 } from '../src/index.js';
-import { BackstoryConfig, type MemoryRecord } from '@backstory/core';
+import { TrackwayConfig, type MemoryRecord } from '@trackway/core';
 
 const run = promisify(execFile);
 
@@ -80,7 +80,7 @@ function decisionRecord(overrides: Partial<Extract<MemoryRecord, { type: 'decisi
 }
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), 'backstory-cli-'));
+  repo = await mkdtemp(join(tmpdir(), 'trackway-cli-'));
   await run('git', ['init', '-q'], { cwd: repo });
   previousCwd = process.cwd();
   process.chdir(repo);
@@ -103,7 +103,7 @@ describe('workspace', () => {
   });
 
   it('reports no workspace outside a git repository', async () => {
-    const loose = await mkdtemp(join(tmpdir(), 'backstory-loose-'));
+    const loose = await mkdtemp(join(tmpdir(), 'trackway-loose-'));
     try {
       expect(await loadWorkspace(loose)).toBeNull();
     } finally {
@@ -112,12 +112,12 @@ describe('workspace', () => {
   });
 
   it('falls back to defaults when no config has been written', async () => {
-    expect(await readConfig(repo)).toEqual(BackstoryConfig.parse({}));
+    expect(await readConfig(repo)).toEqual(TrackwayConfig.parse({}));
   });
 
   it('round-trips a config through disk', async () => {
-    const config = BackstoryConfig.parse({ quietWindowMinutes: 42 });
-    await writeConfig(join(repo, '.backstory'), config);
+    const config = TrackwayConfig.parse({ quietWindowMinutes: 42 });
+    await writeConfig(join(repo, '.trackway'), config);
 
     expect((await readConfig(repo)).quietWindowMinutes).toBe(42);
   });
@@ -133,7 +133,7 @@ describe('workspace', () => {
 
 describe('ignore rules', () => {
   it('ignores the index but leaves records tracked', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await ensureIgnoreRules(storeDir);
     await mkdir(join(storeDir, 'records'), { recursive: true });
     await writeFile(join(storeDir, 'index.sqlite'), 'binary', 'utf8');
@@ -142,12 +142,12 @@ describe('ignore rules', () => {
     const { stdout } = await run('git', ['status', '--porcelain', '--ignored'], { cwd: repo });
 
     // Records are the point of the product, so only the derived index is hidden.
-    expect(stdout).toContain('!! .backstory/index.sqlite');
-    expect(stdout).not.toContain('!! .backstory/records');
+    expect(stdout).toContain('!! .trackway/index.sqlite');
+    expect(stdout).not.toContain('!! .trackway/records');
   });
 
   it('does not duplicate rules when run twice', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
 
     expect(await ensureIgnoreRules(storeDir)).toBe('created');
     expect(await ensureIgnoreRules(storeDir)).toBe('unchanged');
@@ -157,7 +157,7 @@ describe('ignore rules', () => {
   });
 
   it('appends to an ignore file that already has other rules', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await mkdir(storeDir, { recursive: true });
     await writeFile(join(storeDir, '.gitignore'), 'scratch/\n', 'utf8');
 
@@ -169,13 +169,13 @@ describe('ignore rules', () => {
   });
 
   it('actually keeps git from tracking the index', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await ensureIgnoreRules(storeDir);
     await writeFile(join(storeDir, 'index.sqlite'), 'binary', 'utf8');
 
     const { stdout } = await run('git', ['status', '--porcelain', '--ignored'], { cwd: repo });
 
-    expect(stdout).toContain('!! .backstory/index.sqlite');
+    expect(stdout).toContain('!! .trackway/index.sqlite');
   });
 });
 
@@ -396,7 +396,7 @@ describe('forget', () => {
 
 describe('commands outside a repository', () => {
   it('explain the problem rather than failing obscurely', async () => {
-    const loose = await mkdtemp(join(tmpdir(), 'backstory-loose-'));
+    const loose = await mkdtemp(join(tmpdir(), 'trackway-loose-'));
     process.chdir(loose);
 
     try {
@@ -417,7 +417,7 @@ describe('an unusable config file', () => {
     // Found by using the tool: setting quietWindowMinutes to 0 fails validation,
     // the file was discarded, and the setting appeared to have no effect with
     // nothing said about it.
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await mkdir(storeDir, { recursive: true });
     await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: 0\n', 'utf8');
 
@@ -429,7 +429,7 @@ describe('an unusable config file', () => {
   });
 
   it('reports invalid YAML separately from an invalid value', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await mkdir(storeDir, { recursive: true });
     await writeFile(join(storeDir, 'config.yml'), 'quietWindow: [unclosed\n', 'utf8');
 
@@ -439,7 +439,7 @@ describe('an unusable config file', () => {
   });
 
   it('reports an unknown key rather than ignoring it', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await mkdir(storeDir, { recursive: true });
     await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: 20\nverbose: true\n', 'utf8');
 
@@ -450,7 +450,7 @@ describe('an unusable config file', () => {
   });
 
   it('says nothing when the config is valid', async () => {
-    await writeConfig(join(repo, '.backstory'), BackstoryConfig.parse({ quietWindowMinutes: 20 }));
+    await writeConfig(join(repo, '.trackway'), TrackwayConfig.parse({ quietWindowMinutes: 20 }));
 
     const result = await readConfigResult(repo);
 
@@ -465,7 +465,7 @@ describe('an unusable config file', () => {
   });
 
   it('surfaces the problem through a command rather than hiding it', async () => {
-    const storeDir = join(repo, '.backstory');
+    const storeDir = join(repo, '.trackway');
     await mkdir(storeDir, { recursive: true });
     await writeFile(join(storeDir, 'config.yml'), 'quietWindowMinutes: -5\n', 'utf8');
 
@@ -487,7 +487,7 @@ describe('when the index and the files disagree', () => {
     const io = captureIo();
     await statusCommand({}, io);
 
-    expect(io.lines.join('\n')).toContain('backstory rebuild');
+    expect(io.lines.join('\n')).toContain('trackway rebuild');
   });
 
   it('says nothing when the index matches the files', async () => {
@@ -497,7 +497,7 @@ describe('when the index and the files disagree', () => {
     const io = captureIo();
     await statusCommand({}, io);
 
-    expect(io.lines.join('\n')).not.toContain('backstory rebuild');
+    expect(io.lines.join('\n')).not.toContain('trackway rebuild');
   });
 
   it('counts distinct records rather than write attempts', async () => {
@@ -638,7 +638,7 @@ describe('tracing a line back to the decision behind it', () => {
     const io = captureIo();
 
     expect(await whyCommand('cache.ts', '1', {}, io)).toBe(1);
-    expect(io.errors.join('\n')).toContain('backstory sync');
+    expect(io.errors.join('\n')).toContain('trackway sync');
   });
 });
 

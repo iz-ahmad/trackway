@@ -1,4 +1,4 @@
-import { ClaudeCodeAdapter, AdapterRegistry } from '@backstory/adapters';
+import { ClaudeCodeAdapter, AdapterRegistry } from '@trackway/adapters';
 import {
   isolate,
   isolateSync,
@@ -8,9 +8,9 @@ import {
   searchAlternatives,
   writeRecord,
   type MemoryRecord,
-} from '@backstory/core';
-import { runSweep, type Distiller } from '@backstory/distill';
-import { createExplorerApp } from '@backstory/server';
+} from '@trackway/core';
+import { runSweep, type Distiller } from '@trackway/distill';
+import { createExplorerApp } from '@trackway/server';
 import { execFile } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadWorkspace, persist, type Workspace } from 'backstory';
+import { loadWorkspace, persist, type Workspace } from 'trackway';
 
 const run = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,7 +75,7 @@ const fakeDistiller: Distiller = async ({ descriptor, events, fromOffset }) => {
 };
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), 'backstory-e2e-'));
+  repo = await mkdtemp(join(tmpdir(), 'trackway-e2e-'));
   await run('git', ['init', '-q'], { cwd: repo });
   previousCwd = process.cwd();
   process.chdir(repo);
@@ -221,7 +221,7 @@ describe('failure modes', () => {
 
     const db = openIndex(workspace.indexPath);
     try {
-      const { rebuildIndex } = await import('@backstory/core');
+      const { rebuildIndex } = await import('@trackway/core');
       const result = await rebuildIndex(db, workspace.recordsDir);
 
       expect(result.indexed).toBe(1);
@@ -318,7 +318,7 @@ describe('what a person sees in their repository', () => {
     const sweep = await sweepOnce(adapter);
     await persist(workspace, sweep.swept.flatMap((s) => s.records));
 
-    const { ensureIgnoreRules } = await import('backstory');
+    const { ensureIgnoreRules } = await import('trackway');
     await ensureIgnoreRules(workspace.storeDir);
 
     // -uall lists untracked files individually; without it git collapses the
@@ -337,7 +337,7 @@ describe('what a person sees in their repository', () => {
       .map((line) => line.slice(3));
 
     // Records are the point, so they show up as files to commit.
-    expect(untracked.some((path) => path.startsWith('.backstory/records/'))).toBe(true);
+    expect(untracked.some((path) => path.startsWith('.trackway/records/'))).toBe(true);
     // The derived index is hidden, since it would conflict on every merge.
     expect(ignored.some((path) => path.includes('index.sqlite'))).toBe(true);
   });

@@ -1,4 +1,4 @@
-import type { MemoryEvent, SessionDescriptor } from '@backstory/core';
+import type { MemoryEvent, SessionDescriptor } from '@trackway/core';
 
 /**
  * What an adapter can do, declared rather than assumed.
@@ -21,7 +21,7 @@ export interface AdapterCapabilities {
 
 export interface AdapterAvailability {
   available: boolean;
-  /** Why not, when unavailable. Surfaced by `backstory status`. */
+  /** Why not, when unavailable. Surfaced by `trackway status`. */
   reason?: string;
 }
 

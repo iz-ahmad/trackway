@@ -28,7 +28,7 @@ let storeDir: string;
 
 beforeEach(async () => {
   db = openIndex(':memory:');
-  storeDir = await mkdtemp(join(tmpdir(), 'backstory-index-'));
+  storeDir = await mkdtemp(join(tmpdir(), 'trackway-index-'));
 });
 
 afterEach(async () => {

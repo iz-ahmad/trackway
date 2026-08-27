@@ -1,4 +1,4 @@
-import type { MemoryRecord } from '@backstory/core';
+import type { MemoryRecord } from '@trackway/core';
 import { describe, expect, it } from 'vitest';
 import { buildTriagePrompt, triageDiscoveries, type DistillRunner } from '../src/index.js';
 

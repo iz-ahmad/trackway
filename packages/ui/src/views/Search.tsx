@@ -41,7 +41,7 @@ export function Search({ query }: { query: string }): ReactElement {
       <div className="empty">
         <h3>Nothing matches “{query}”</h3>
         <p>
-          Backstory searches the records it wrote, not the raw session files behind them. Try a
+          Trackway searches the records it wrote, not the raw session files behind them. Try a
           different word, or clear the search to browse by topic.
         </p>
         <p>

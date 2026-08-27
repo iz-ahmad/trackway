@@ -17,7 +17,7 @@ export interface IsolateOptions {
 /**
  * Runs work that must never take the caller down with it.
  *
- * Backstory runs beside a developer's coding session and, once a hook is
+ * Trackway runs beside a developer's coding session and, once a hook is
  * installed, inside its lifecycle. An unhandled rejection or a non-zero exit
  * from a sweep surfaces as an error in that session. Interrupting the work the
  * developer is actually doing is the one outcome this system must never cause,

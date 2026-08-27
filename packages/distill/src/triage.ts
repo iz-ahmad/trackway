@@ -1,4 +1,4 @@
-import type { MemoryRecord } from '@backstory/core';
+import type { MemoryRecord } from '@trackway/core';
 import { z } from 'zod';
 import type { DistillRunner } from './runner/contract.js';
 import { extractJsonObject } from './runner/validate.js';

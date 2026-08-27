@@ -1,4 +1,4 @@
-import type { MemoryEvent, MemoryRecord } from '@backstory/core';
+import type { MemoryEvent, MemoryRecord } from '@trackway/core';
 import { describe, expect, it } from 'vitest';
 import {
   aggregate,

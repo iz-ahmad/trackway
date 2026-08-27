@@ -1,5 +1,5 @@
-import type { AdapterRegistry, SessionAdapter } from '@backstory/adapters';
-import type { MemoryEvent, MemoryRecord, SessionDescriptor } from '@backstory/core';
+import type { AdapterRegistry, SessionAdapter } from '@trackway/adapters';
+import type { MemoryEvent, MemoryRecord, SessionDescriptor } from '@trackway/core';
 import { assessEligibility, type SkipReason } from './quiet.js';
 import { loadState, saveState, stateKey, type SweepState } from './state.js';
 

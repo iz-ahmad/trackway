@@ -1,4 +1,4 @@
-import { defaultRegistry, parseTranscript } from '@backstory/adapters';
+import { defaultRegistry, parseTranscript } from '@trackway/adapters';
 import {
   attributeToPeople,
   commitsBetween,
@@ -9,15 +9,15 @@ import {
   upsertRecords,
   writeRecords,
   type MemoryRecord,
-} from '@backstory/core';
+} from '@trackway/core';
 import {
   ClaudeDistillRunner,
   createDistiller,
   purgeCache,
   runSweep,
   type SweepResult,
-} from '@backstory/distill';
-import { isolate } from '@backstory/core';
+} from '@trackway/distill';
+import { isolate } from '@trackway/core';
 import { join } from 'node:path';
 import { openWorkspaceIndex, type Workspace } from './workspace.js';
 
@@ -36,7 +36,7 @@ export interface SyncOptions {
 /**
  * Sweep, distil, write records, update the index.
  *
- * Nothing here throws. This runs from `backstory sync`, from every other
+ * Nothing here throws. This runs from `trackway sync`, from every other
  * command as a self-heal, and from an agent hook, and in all three cases a
  * failure must be reported rather than raised. Interrupting the developer's
  * coding session is the one outcome this system must never cause.

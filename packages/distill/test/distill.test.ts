@@ -1,4 +1,4 @@
-import { withDerivedId, type MemoryEvent, type SessionDescriptor } from '@backstory/core';
+import { withDerivedId, type MemoryEvent, type SessionDescriptor } from '@trackway/core';
 import { describe, expect, it } from 'vitest';
 import {
   ClaudeDistillRunner,
@@ -734,7 +734,7 @@ describe('collapsing records that say the same thing twice', () => {
       id: 'disc-1',
       type: 'discovery' as const,
       text: 'Which cache Redis',
-    } as unknown as import('@backstory/core').MemoryRecord;
+    } as unknown as import('@trackway/core').MemoryRecord;
 
     expect(collapseNearDuplicates([decision, discovery])).toHaveLength(2);
   });

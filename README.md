@@ -1,8 +1,8 @@
-# Backstory
+# Trackway
 
-**Git tells you what your code became. Backstory tells you what it almost became, and why you decided against it.**
+**Git tells you what your code became. Trackway tells you what it almost became, and why you decided against it.**
 
-Backstory reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
+Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
 > **Status:** working, not released. The full path runs end to end. See [How well does it work](#how-well-does-it-work) for measured quality and [Release](#release) for what is left before it can be installed from a registry.
 
@@ -10,7 +10,7 @@ Backstory reads the session files your coding agent already writes to disk and t
 
 You plan a feature with an agent. You weigh three approaches and pick one. The argument against the two you dropped gets written down at the moment you are deciding, while you genuinely do not know the answer yet. Then it evaporates.
 
-Two weeks later you can ask Backstory *why didn't we use a background daemon?* and get the actual answer back:
+Two weeks later you can ask Trackway *why didn't we use a background daemon?* and get the actual answer back:
 
 > **Background daemon only** — rejected. *Fails silently in many ways (doesn't start, crashes, two copies), hard to debug when broken.*
 
@@ -21,7 +21,7 @@ Nothing else in your toolchain keeps that:
 | Git history | what you built |
 | PR descriptions | what you are shipping |
 | ADRs | what you decided, written afterward and quietly rationalized |
-| **Backstory** | **what you considered, and the case against each, written before the outcome was known** |
+| **Trackway** | **what you considered, and the case against each, written before the outcome was known** |
 
 That last property is the one that is hard to fake. An architecture decision record written after the fact already knows how the story ended. These do not.
 
@@ -29,7 +29,7 @@ The second use is sharper than the first: **rejections expire.** "Conflicts with
 
 ### When not to use it
 
-Be honest about the fit. Backstory is not worth the disk space if:
+Be honest about the fit. Trackway is not worth the disk space if:
 
 - The project is short-lived. You will remember.
 - You already write ADRs seriously. Heavy overlap.
@@ -39,7 +39,7 @@ The honest fit is a developer working with an agent across months, on a codebase
 
 ## How it works
 
-Coding agents write every session to disk as they go. Backstory reads those files. It does not hook into your agent, sit between you and your model, or capture anything live.
+Coding agents write every session to disk as they go. Trackway reads those files. It does not hook into your agent, sit between you and your model, or capture anything live.
 
 ```
 agent session files          you keep working normally
@@ -51,15 +51,15 @@ agent session files          you keep working normally
     harvest recorded forks  ──┐
     distil the rest          ─┤
                               v
-                    .backstory/records/*.md   ← git-tracked, in your diffs
+                    .trackway/records/*.md   ← git-tracked, in your diffs
                               |
                               v
               search · explorer · MCP retrieval
 ```
 
-Two paths produce records, and they are not equally reliable. Backstory is explicit about which one a record came from.
+Two paths produce records, and they are not equally reliable. Trackway is explicit about which one a record came from.
 
-**Harvested forks (deterministic).** When an agent presents you an explicit list of options, it stores the question, every option, and each option's rationale as structured tool input. Backstory reads that verbatim. No inference, no summarising, no model call. Measured across 485 real sessions, 186 forks were recorded this way, and every one is now classified:
+**Harvested forks (deterministic).** When an agent presents you an explicit list of options, it stores the question, every option, and each option's rationale as structured tool input. Trackway reads that verbatim. No inference, no summarising, no model call. Measured across 485 real sessions, 186 forks were recorded this way, and every one is now classified:
 
 | Outcome | Share | Recorded as |
 | --- | --- | --- |
@@ -74,14 +74,14 @@ Two paths produce records, and they are not equally reliable. Backstory is expli
 Not yet on a registry. See [Release](#release).
 
 ```bash
-git clone https://github.com/me-shaon/backstory.git
-cd backstory
+git clone https://github.com/me-shaon/trackway.git
+cd trackway
 npm install
 npm run build
-npm link            # puts `backstory` on your PATH
+npm link            # puts `trackway` on your PATH
 
 cd ~/your-project
-backstory init
+trackway init
 ```
 
 Requires **Node 22 or newer** and a coding agent that stores sessions locally.
@@ -93,17 +93,17 @@ Requires **Node 22 or newer** and a coding agent that stores sessions locally.
 Work with your agent normally. There are no commands to run during a session.
 
 ```bash
-backstory sync                                 # distil sessions that have gone quiet
-backstory why src/limit.ts 42                  # what was decided that produced this line
-backstory search "why is cancellation async"   # search everything
-backstory rejected --about caching             # options you dropped, and why
-backstory decisions --actor human              # decisions you made, not the agent
-backstory show dec-20260824-a3f2               # one record in full
-backstory status                               # what is pending or failed
-backstory graph                                # open the local explorer
+trackway sync                                 # distil sessions that have gone quiet
+trackway why src/limit.ts 42                  # what was decided that produced this line
+trackway search "why is cancellation async"   # search everything
+trackway rejected --about caching             # options you dropped, and why
+trackway decisions --actor human              # decisions you made, not the agent
+trackway show dec-20260824-a3f2               # one record in full
+trackway status                               # what is pending or failed
+trackway graph                                # open the local explorer
 ```
 
-`backstory graph` serves three views from your machine, with no account and no network:
+`trackway graph` serves three views from your machine, with no account and no network:
 
 - **Story.** What happened on this project, grouped by topic, in the order it happened.
 - **Decisions.** Every fork, ordered by how many options it recorded, each with the branches you did not take.
@@ -115,25 +115,25 @@ Full reference:
 
 | Command | Does |
 | --- | --- |
-| `backstory init` | set up the current repository |
-| `backstory sync` | distil sessions that have gone quiet |
-| `backstory ingest [file]` | read a transcript from any agent, from a file or stdin |
-| `backstory why <file> [line]` | what was decided that produced this line, and what was rejected |
-| `backstory status` | what is stored, which agents were found, what is pending |
-| `backstory search <query>` | full-text search across every record |
-| `backstory rejected [query]` | options considered and not taken |
-| `backstory decisions` | decisions, newest first |
-| `backstory show <id>` | one record in full |
-| `backstory sessions` | sessions that produced records |
-| `backstory forget <target>` | remove a record, or every record from a session |
-| `backstory graph` | open the local explorer |
-| `backstory mcp` | serve memory to a coding agent over stdio, read-only |
-| `backstory eval` | measure extraction quality against the sessions' own answer key |
-| `backstory rebuild` | rebuild the search index from the record files |
+| `trackway init` | set up the current repository |
+| `trackway sync` | distil sessions that have gone quiet |
+| `trackway ingest [file]` | read a transcript from any agent, from a file or stdin |
+| `trackway why <file> [line]` | what was decided that produced this line, and what was rejected |
+| `trackway status` | what is stored, which agents were found, what is pending |
+| `trackway search <query>` | full-text search across every record |
+| `trackway rejected [query]` | options considered and not taken |
+| `trackway decisions` | decisions, newest first |
+| `trackway show <id>` | one record in full |
+| `trackway sessions` | sessions that produced records |
+| `trackway forget <target>` | remove a record, or every record from a session |
+| `trackway graph` | open the local explorer |
+| `trackway mcp` | serve memory to a coding agent over stdio, read-only |
+| `trackway eval` | measure extraction quality against the sessions' own answer key |
+| `trackway rebuild` | rebuild the search index from the record files |
 
 ## What gets stored
 
-Records are markdown with YAML front matter, one file per record, in `.backstory/records/`. They are meant to be committed. They show up in your diffs and your pull requests, which is the point: a decision that changed should be visible when it changes.
+Records are markdown with YAML front matter, one file per record, in `.trackway/records/`. They are meant to be committed. They show up in your diffs and your pull requests, which is the point: a decision that changed should be visible when it changes.
 
 Five record types: **question**, **discovery**, **decision**, **action**, **outcome**.
 
@@ -167,17 +167,17 @@ Credential redaction is best effort. A secret shaped like ordinary prose will ge
 
 OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
 
-**Cursor has no adapter yet.** Its chat history lives in an undocumented SQLite database and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason. Until then, `backstory ingest` takes it, and anything else.
+**Cursor has no adapter yet.** Its chat history lives in an undocumented SQLite database and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason. Until then, `trackway ingest` takes it, and anything else.
 
 Adding a first-class adapter means writing a parser behind one interface. Nothing in the core changes.
 
 ## Any other agent
 
-Every adapter above reads a store somebody else designed, so support waits on reverse-engineering a format and on owning a machine with that agent installed. `backstory ingest` needs neither. Pipe it a transcript and it becomes records like any session found on disk: same distillation, same fork harvesting, same commit linking.
+Every adapter above reads a store somebody else designed, so support waits on reverse-engineering a format and on owning a machine with that agent installed. `trackway ingest` needs neither. Pipe it a transcript and it becomes records like any session found on disk: same distillation, same fork harvesting, same commit linking.
 
 ```bash
-cat chat.json | backstory ingest
-backstory ingest chat.json
+cat chat.json | trackway ingest
+trackway ingest chat.json
 ```
 
 ```json
@@ -223,14 +223,14 @@ That produces a decision carrying the option taken and both rejected ones with t
 
 ## For agents
 
-Backstory ships a read-only MCP server so your coding agent can consult prior decisions before proposing changes. Results come back as dated evidence with attribution and source, not as commands. The agent decides what to do with them.
+Trackway ships a read-only MCP server so your coding agent can consult prior decisions before proposing changes. Results come back as dated evidence with attribution and source, not as commands. The agent decides what to do with them.
 
 The server exposes no write tool. Records are created by distillation only.
 
 ```json
 {
   "mcpServers": {
-    "backstory": { "command": "backstory", "args": ["mcp"] }
+    "trackway": { "command": "trackway", "args": ["mcp"] }
   }
 }
 ```
@@ -260,14 +260,14 @@ Nothing gates a release on these numbers, by design. Suppressing a useful record
 Run it yourself:
 
 ```bash
-backstory eval
+trackway eval
 ```
 
 ## Release
 
 Not published. Three things stand in the way, and one of them is a name.
 
-1. **The npm name `backstory` is taken.** It belongs to an unrelated tool that attaches AI prompts to git commits as git notes. A scoped name such as `@me-shaon/backstory` is free and keeps the word.
+1. **The npm name `trackway` is taken.** It belongs to an unrelated tool that attaches AI prompts to git commits as git notes. A scoped name such as `@me-shaon/trackway` is free and keeps the word.
 2. **Every workspace package is `private: true`** at version `0.0.0`. The CLI depends on five of them, so publishing the CLI alone would install a broken package. Either publish all six under a scope, or bundle the workspace dependencies into the CLI so one package ships.
 3. **No `files` field** in any package, so a publish would ship sources, tests, and fixtures.
 

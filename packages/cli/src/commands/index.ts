@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { InvalidTranscriptError, defaultRegistry } from '@backstory/adapters';
+import { InvalidTranscriptError, defaultRegistry } from '@trackway/adapters';
 import {
-  BackstoryConfig,
+  TrackwayConfig,
   blameLine,
   commitBySha,
   commitsTouching,
@@ -19,8 +19,8 @@ import {
   searchAlternatives,
   type MemoryRecord,
   type RecordType,
-} from '@backstory/core';
-import { loadState } from '@backstory/distill';
+} from '@trackway/core';
+import { loadState } from '@trackway/distill';
 import { alternativeLine, detail, oneLine, shortDate, truncate } from '../format.js';
 import { hookCommand, hookTargets, installHook, isHookInstalled } from '../hook.js';
 import { ingestTranscript, sync } from '../pipeline.js';
@@ -42,7 +42,7 @@ export const consoleIo: Io = {
   err: (line) => process.stderr.write(`${line}\n`),
 };
 
-const NOT_A_REPO = 'Not inside a git repository. Backstory stores records per repository.';
+const NOT_A_REPO = 'Not inside a git repository. Trackway stores records per repository.';
 
 async function requireWorkspace(io: Io): Promise<Workspace | null> {
   const workspace = await loadWorkspace();
@@ -81,10 +81,10 @@ export async function initCommand(options: { hook?: boolean }, io: Io = consoleI
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
 
-  await writeConfig(workspace.storeDir, BackstoryConfig.parse({}));
+  await writeConfig(workspace.storeDir, TrackwayConfig.parse({}));
   const ignore = await ensureIgnoreRules(workspace.storeDir);
 
-  io.out(`Initialized Backstory in ${workspace.storeDir}`);
+  io.out(`Initialized Trackway in ${workspace.storeDir}`);
   io.out(`  config:      ${workspace.config.storePath}/config.yml`);
   io.out(`  records:     ${workspace.config.storePath}/records/  (tracked by git)`);
   io.out(`  index:       ${workspace.config.storePath}/index.sqlite  (${ignore === 'created' ? 'now ignored' : 'already ignored'})`);
@@ -102,7 +102,7 @@ export async function initCommand(options: { hook?: boolean }, io: Io = consoleI
   }
 
   if (options.hook === false) {
-    io.out('\nSkipped hook install. Records catch up whenever you run a backstory command.');
+    io.out('\nSkipped hook install. Records catch up whenever you run a trackway command.');
     return 0;
   }
 
@@ -119,7 +119,7 @@ export async function initCommand(options: { hook?: boolean }, io: Io = consoleI
       io.out('This is once per machine and covers every repository.');
     } else if (result.status === 'failed') {
       io.err(`Could not install the hook for ${target.agent}: ${result.reason ?? 'unknown'}`);
-      io.err('Records will still catch up whenever you run a backstory command.');
+      io.err('Records will still catch up whenever you run a trackway command.');
     }
   }
 
@@ -181,7 +181,7 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
   const onDisk = await readAllRecords(workspace.recordsDir);
   if (onDisk.records.length !== total) {
     io.out(
-      `\nThe index lists ${total} records but ${onDisk.records.length} are on disk. Run: backstory rebuild`,
+      `\nThe index lists ${total} records but ${onDisk.records.length} are on disk. Run: trackway rebuild`,
     );
   }
   if (onDisk.failures.length > 0) {
@@ -217,7 +217,7 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
 
   const pending = await countPending(workspace);
   if (pending > 0) {
-    io.out(`\n${pending} quiet session(s) not yet distilled. Run: backstory sync`);
+    io.out(`\n${pending} quiet session(s) not yet distilled. Run: trackway sync`);
   }
 
   return 0;
@@ -395,7 +395,7 @@ export async function sessionsCommand(
     }
 
     if (sessions.length === 0) {
-      io.out('No sessions recorded yet. Run: backstory sync');
+      io.out('No sessions recorded yet. Run: trackway sync');
       return 0;
     }
 
@@ -467,7 +467,7 @@ export async function mcpCommand(_options: unknown, io: Io = consoleIo): Promise
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
 
-  const { serveMcpOverStdio } = await import('@backstory/server');
+  const { serveMcpOverStdio } = await import('@trackway/server');
   const db = openWorkspaceIndex(workspace);
 
   // stdout carries the protocol, so nothing else may be written to it.
@@ -592,7 +592,7 @@ export async function whyCommand(
     io.err(
       covering.length > 0
         ? `Run again with --all to see the ${covering.length} working record${covering.length === 1 ? '' : 's'} that do.`
-        : 'Run `backstory sync` if that session has not been distilled yet.',
+        : 'Run `trackway sync` if that session has not been distilled yet.',
     );
     return 1;
   }

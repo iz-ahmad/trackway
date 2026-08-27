@@ -1,4 +1,4 @@
-import type { EventType, MemoryEvent } from '@backstory/core';
+import type { EventType, MemoryEvent } from '@trackway/core';
 import { sanitize } from '../redact/index.js';
 import { FORMAT_V1, type RawEntry } from './format.js';
 

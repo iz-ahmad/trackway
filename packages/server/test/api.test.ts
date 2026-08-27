@@ -1,4 +1,4 @@
-import { openIndex, upsertRecords, type IndexDatabase, type MemoryRecord } from '@backstory/core';
+import { openIndex, upsertRecords, type IndexDatabase, type MemoryRecord } from '@trackway/core';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,7 +64,7 @@ const discovery: MemoryRecord = {
 beforeEach(async () => {
   db = openIndex(':memory:');
   upsertRecords(db, [decision, discovery]);
-  uiDir = await mkdtemp(join(tmpdir(), 'backstory-ui-'));
+  uiDir = await mkdtemp(join(tmpdir(), 'trackway-ui-'));
   await mkdir(join(uiDir, 'assets'), { recursive: true });
   await mkdir(join(uiDir, 'fonts'), { recursive: true });
   await writeFile(join(uiDir, 'index.html'), '<!doctype html><div id="root"></div>', 'utf8');

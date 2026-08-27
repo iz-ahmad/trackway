@@ -1,4 +1,4 @@
-import type { IndexDatabase } from '@backstory/core';
+import type { IndexDatabase } from '@trackway/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -30,7 +30,7 @@ export const MCP_TOOL_NAMES = [
  */
 export function createMcpServer(context: ToolContext): McpServer {
   const server = new McpServer(
-    { name: 'backstory', version: '0.1.0' },
+    { name: 'trackway', version: '0.1.0' },
     { capabilities: { tools: {} } },
   );
 

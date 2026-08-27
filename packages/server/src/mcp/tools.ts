@@ -5,7 +5,7 @@ import {
   searchAlternatives,
   type IndexDatabase,
   type MemoryRecord,
-} from '@backstory/core';
+} from '@trackway/core';
 
 /**
  * How a record is presented to a consuming agent.

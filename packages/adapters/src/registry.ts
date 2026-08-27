@@ -1,4 +1,4 @@
-import type { SessionDescriptor } from '@backstory/core';
+import type { SessionDescriptor } from '@trackway/core';
 import type { ListOptions, SessionAdapter } from './contract.js';
 
 export interface AdapterStatus {
@@ -48,7 +48,7 @@ export class AdapterRegistry {
     return checks.filter((entry) => entry.availability.available).map((entry) => entry.adapter);
   }
 
-  /** What `backstory status` reports about each adapter. */
+  /** What `trackway status` reports about each adapter. */
   async status(): Promise<AdapterStatus[]> {
     return Promise.all(
       this.adapters.map(async (adapter) => {

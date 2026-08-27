@@ -141,7 +141,7 @@ describe('a fork recorded in a transcript', () => {
   it('shapes the events so the deterministic harvester can read them', async () => {
     // The point of documenting the tool shape: an adapter that emits an option
     // list this way gets the accurate path, not the model-extracted one.
-    const { harvestForks } = await import('@backstory/distill');
+    const { harvestForks } = await import('@trackway/distill');
     const { events } = parseTranscript(fork);
 
     const [harvested] = harvestForks(events);
@@ -151,7 +151,7 @@ describe('a fork recorded in a transcript', () => {
   });
 
   it('keeps every option and its own reasoning', async () => {
-    const { harvestForks } = await import('@backstory/distill');
+    const { harvestForks } = await import('@trackway/distill');
     const { events } = parseTranscript(fork);
 
     expect(harvestForks(events)[0]?.options).toEqual([

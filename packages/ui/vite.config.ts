@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 
 /**
  * The explorer is built ahead of publishing and shipped as static files, so
- * installing Backstory needs no toolchain and `backstory graph` starts at once.
+ * installing Trackway needs no toolchain and `trackway graph` starts at once.
  */
 export default defineConfig({
   plugins: [react()],

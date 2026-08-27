@@ -109,7 +109,7 @@ export function RecordRow({ record, muted = false }: Props): ReactElement {
         {/*
           What this decision turned into. Matched from the record's own time
           window against the repository's history, so it works on commits made
-          long before Backstory was installed.
+          long before Trackway was installed.
         */}
         {record.commits.length > 0 ? (
           <div className="commits">

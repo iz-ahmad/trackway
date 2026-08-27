@@ -1,5 +1,5 @@
-import type { MemoryEvent, SessionDescriptor } from '@backstory/core';
-import { MemoryEvent as MemoryEventSchema } from '@backstory/core';
+import type { MemoryEvent, SessionDescriptor } from '@trackway/core';
+import { MemoryEvent as MemoryEventSchema } from '@trackway/core';
 import { describe, expect, it } from 'vitest';
 import {
   AdapterRegistry,

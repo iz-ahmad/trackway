@@ -1,5 +1,5 @@
-import type { SessionAdapter } from '@backstory/adapters';
-import type { SessionDescriptor } from '@backstory/core';
+import type { SessionAdapter } from '@trackway/adapters';
+import type { SessionDescriptor } from '@trackway/core';
 import type { Distiller } from '../sweep/run.js';
 import { extractGroundTruth } from './ground-truth.js';
 import { describeForJudge, type Judge } from './judge.js';

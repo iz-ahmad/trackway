@@ -123,7 +123,7 @@ export function FirstRun(): ReactElement {
     <div className="empty">
       <h3>Nothing recorded yet</h3>
       <p>
-        Backstory reads a session once it goes quiet. Run <code>backstory sync</code> to turn the
+        Trackway reads a session once it goes quiet. Run <code>trackway sync</code> to turn the
         sessions already on disk into records.
       </p>
     </div>
@@ -150,7 +150,7 @@ export function Problem({ detail }: { detail: string }): ReactElement {
       <h3>Could not reach the local server</h3>
       <p>
         The explorer reads from a server on this machine. If it has stopped, run{' '}
-        <code>backstory graph</code> again.
+        <code>trackway graph</code> again.
       </p>
       <p className="detail">{detail}</p>
     </div>

@@ -1,4 +1,4 @@
-import { withDerivedId, type MemoryRecord } from '@backstory/core';
+import { withDerivedId, type MemoryRecord } from '@trackway/core';
 import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
 import { describeForksForPrompt, forkAlternatives, harvestForks, type HarvestedFork } from './harvest.js';
 import { collapseNearDuplicates } from './dedupe.js';

@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-export const DEFAULT_STORE_DIR = '.backstory';
+export const DEFAULT_STORE_DIR = '.trackway';
 export const DEFAULT_QUIET_WINDOW_MINUTES = 15;
 export const DEFAULT_CACHE_RETENTION_DAYS = 30;
 
-export const BackstoryConfig = z.strictObject({
+export const TrackwayConfig = z.strictObject({
   /** Repo-relative directory holding records. Tracked by git. */
   storePath: z.string().min(1).default(DEFAULT_STORE_DIR),
 
@@ -22,8 +22,8 @@ export const BackstoryConfig = z.strictObject({
   adapters: z.array(z.string().min(1)).default(['claude-code', 'codex', 'opencode']),
 });
 
-export type BackstoryConfig = z.infer<typeof BackstoryConfig>;
+export type TrackwayConfig = z.infer<typeof TrackwayConfig>;
 
-export function defaultConfig(): BackstoryConfig {
-  return BackstoryConfig.parse({});
+export function defaultConfig(): TrackwayConfig {
+  return TrackwayConfig.parse({});
 }

@@ -1,4 +1,4 @@
-import { BackstoryConfig, openIndex, type IndexDatabase } from '@backstory/core';
+import { TrackwayConfig, openIndex, type IndexDatabase } from '@trackway/core';
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -19,13 +19,13 @@ export interface Workspace {
   recordsDir: string;
   cacheDir: string;
   indexPath: string;
-  config: BackstoryConfig;
+  config: TrackwayConfig;
 }
 
 /**
  * Finds the repository root.
  *
- * Backstory is repo-scoped, and the store belongs at the root rather than in
+ * Trackway is repo-scoped, and the store belongs at the root rather than in
  * whatever subdirectory a command happened to be run from.
  */
 export async function findRepoRoot(from: string = process.cwd()): Promise<string | null> {
@@ -51,14 +51,14 @@ export async function loadWorkspace(from?: string): Promise<Workspace | null> {
     recordsDir: join(storeDir, 'records'),
     // The cache holds parsed session content, so it lives outside the repo
     // entirely. A misconfigured ignore rule should not be able to commit it.
-    cacheDir: join(homedir(), '.backstory', 'cache', encodeURIComponent(repoRoot)),
+    cacheDir: join(homedir(), '.trackway', 'cache', encodeURIComponent(repoRoot)),
     indexPath: join(storeDir, INDEX_FILE),
     config,
   };
 }
 
 export interface ConfigResult {
-  config: BackstoryConfig;
+  config: TrackwayConfig;
   /** Set when a config file exists but could not be used. */
   problem?: string;
 }
@@ -72,7 +72,7 @@ export interface ConfigResult {
  * edit never happened.
  */
 export async function readConfigResult(repoRoot: string): Promise<ConfigResult> {
-  for (const dir of ['.backstory', '.memory']) {
+  for (const dir of ['.trackway', '.memory']) {
     let raw: string;
     try {
       raw = await readFile(join(repoRoot, dir, CONFIG_FILE), 'utf8');
@@ -85,12 +85,12 @@ export async function readConfigResult(repoRoot: string): Promise<ConfigResult> 
       parsedYaml = parseYaml(raw) ?? {};
     } catch (error) {
       return {
-        config: BackstoryConfig.parse({}),
+        config: TrackwayConfig.parse({}),
         problem: `${dir}/${CONFIG_FILE} is not valid YAML (${String(error).slice(0, 120)}); using defaults`,
       };
     }
 
-    const parsed = BackstoryConfig.safeParse(parsedYaml);
+    const parsed = TrackwayConfig.safeParse(parsedYaml);
     if (parsed.success) return { config: parsed.data };
 
     const detail = parsed.error.issues
@@ -98,19 +98,19 @@ export async function readConfigResult(repoRoot: string): Promise<ConfigResult> 
       .join('; ');
 
     return {
-      config: BackstoryConfig.parse({}),
+      config: TrackwayConfig.parse({}),
       problem: `${dir}/${CONFIG_FILE} was rejected (${detail}); using defaults`,
     };
   }
 
-  return { config: BackstoryConfig.parse({}) };
+  return { config: TrackwayConfig.parse({}) };
 }
 
-export async function readConfig(repoRoot: string): Promise<BackstoryConfig> {
+export async function readConfig(repoRoot: string): Promise<TrackwayConfig> {
   return (await readConfigResult(repoRoot)).config;
 }
 
-export async function writeConfig(storeDir: string, config: BackstoryConfig): Promise<void> {
+export async function writeConfig(storeDir: string, config: TrackwayConfig): Promise<void> {
   await mkdir(storeDir, { recursive: true });
   await writeFile(join(storeDir, CONFIG_FILE), stringifyYaml(config), 'utf8');
 }
@@ -124,14 +124,14 @@ export function openWorkspaceIndex(workspace: Workspace): IndexDatabase {
 }
 
 /**
- * Ignore rules Backstory needs.
+ * Ignore rules Trackway needs.
  *
  * The index is a binary that would conflict on every merge, and it is
  * rebuildable from the records, so tracking it is pure cost. Records themselves
  * stay tracked: they are the point.
  */
 export const IGNORE_RULES = [
-  '# Backstory: derived index, rebuildable from records',
+  '# Trackway: derived index, rebuildable from records',
   'index.sqlite',
   'index.sqlite-shm',
   'index.sqlite-wal',

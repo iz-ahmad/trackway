@@ -1,4 +1,4 @@
-import type { MemoryEvent } from '@backstory/core';
+import type { MemoryEvent } from '@trackway/core';
 
 /**
  * Events per distillation call.

@@ -99,7 +99,7 @@ export function App(): ReactElement {
         <div className="wrap">
           <div className="bar">
             <div className="wordmark">
-              <h1>Backstory</h1>
+              <h1>Trackway</h1>
               <p>The history behind your code</p>
             </div>
 
