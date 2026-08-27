@@ -241,7 +241,7 @@ Two paths, two very different answers. Conflating them would flatter the tool.
 
 **Harvested forks: deterministic.** Read verbatim from structured tool input. There is nothing to be accurate about; the data is the data. 186 forks across 485 sessions, all classified, none unresolved.
 
-**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list, that list is ground truth with no hand labelling. 44 of 110 sessions carry one, giving 178 known decision points.
+**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list, that list is ground truth with no hand labelling. Across 485 sessions, 165 forks were recorded and resolved, and each is one known decision point.
 
 Measured across 7 sessions of 15 to 260 events: **precision 0.57, recall 0.68, F1 0.62**.
 
@@ -286,7 +286,7 @@ Deliberately not in version 1:
 ```bash
 npm install
 npm run build      # compiles packages and builds the explorer
-npm test           # 428 tests
+npm test           # 472 tests
 npm run typecheck  # strict mode, sources and tests
 ```
 
