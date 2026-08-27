@@ -1,18 +1,41 @@
 # Backstory
 
-The history behind your code.
+**Git tells you what your code became. Backstory tells you what it almost became, and why you decided against it.**
 
-Backstory reads the session files your coding agent already writes to disk. It turns them into a searchable, version-controlled record of the questions you asked, the things you discovered, the decisions you made, and the options you rejected.
+Backstory reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
-> **Status:** working, not yet released. The full path runs end to end: it reads real sessions, distils them, writes records, indexes them, and serves search, an explorer, and MCP retrieval. Extraction quality is measured but not yet good enough to call finished. See [How well does it work](#how-well-does-it-work).
+> **Status:** working, not released. The full path runs end to end. See [How well does it work](#how-well-does-it-work) for measured quality and [Release](#release) for what is left before it can be installed from a registry.
 
-## The problem
+## Why use this
 
-You plan a feature with a coding agent. You weigh three approaches and pick one. Two weeks later you cannot remember why you rejected the other two.
+You plan a feature with an agent. You weigh three approaches and pick one. The argument against the two you dropped gets written down at the moment you are deciding, while you genuinely do not know the answer yet. Then it evaporates.
 
-The reasoning is not actually lost. It is sitting in a session file on your disk, along with hundreds of other session files, with no way to search them. Git tells you what the code became. It does not tell you what you considered and dropped, or what you learned along the way that made the decision obvious at the time.
+Two weeks later you can ask Backstory *why didn't we use a background daemon?* and get the actual answer back:
 
-Backstory makes that record searchable.
+> **Background daemon only** — rejected. *Fails silently in many ways (doesn't start, crashes, two copies), hard to debug when broken.*
+
+Nothing else in your toolchain keeps that:
+
+| Source | Records |
+| --- | --- |
+| Git history | what you built |
+| PR descriptions | what you are shipping |
+| ADRs | what you decided, written afterward and quietly rationalized |
+| **Backstory** | **what you considered, and the case against each, written before the outcome was known** |
+
+That last property is the one that is hard to fake. An architecture decision record written after the fact already knows how the story ended. These do not.
+
+The second use is sharper than the first: **rejections expire.** "Conflicts with existing hooks, adds latency to commit" is only true while those conditions hold. When they change, that rejection is now wrong, and you can go find it.
+
+### When not to use it
+
+Be honest about the fit. Backstory is not worth the disk space if:
+
+- The project is short-lived. You will remember.
+- You already write ADRs seriously. Heavy overlap.
+- You need a shared team decision log. This is single-developer and local. Records land in git, but there is no review gate, so a teammate has no particular reason to trust an automatically extracted record.
+
+The honest fit is a developer working with an agent across months, on a codebase they will still be in next year, who has already had the experience of not remembering why something is the way it is.
 
 ## How it works
 
@@ -25,35 +48,52 @@ agent session files          you keep working normally
     parse, strip model reasoning, redact credentials
         |
         v
-    distill quiet sessions into records
-        |
-        v
-    .backstory/  (git-tracked markdown)
-        |
-        +--> search        backstory search "why async"
-        +--> explorer      backstory graph
-        +--> your agent    via MCP
+    harvest recorded forks  ──┐
+    distil the rest          ─┤
+                              v
+                    .backstory/records/*.md   ← git-tracked, in your diffs
+                              |
+                              v
+              search · explorer · MCP retrieval
 ```
 
-Distillation runs your own coding agent in headless mode. There is no second API key to configure and no separate provider to pay for.
+Two paths produce records, and they are not equally reliable. Backstory is explicit about which one a record came from.
 
-A session is distilled once it stops changing. Closing a terminal, clearing a session, or crashing loses nothing, because the file was already written.
+**Harvested forks (deterministic).** When an agent presents you an explicit list of options, it stores the question, every option, and each option's rationale as structured tool input. Backstory reads that verbatim. No inference, no summarising, no model call. Measured across 485 real sessions, 186 forks were recorded this way, and every one is now classified:
+
+| Outcome | Share | Recorded as |
+| --- | --- | --- |
+| You picked one of the options | 78% | a decision, with the rest as rejected options |
+| You typed your own answer instead | 10% | a decision you authored, with **every** offered option rejected |
+| You dismissed the question | 12% | an open question, because nothing was decided |
+
+**Distillation (model-extracted).** Everything else goes through your own agent, running headless. This path is where the quality numbers below come from. It is a fallback, not the main event.
 
 ## Install
 
+Not yet on a registry. See [Release](#release).
+
 ```bash
-npm install -g backstory
-cd your-project
+git clone https://github.com/me-shaon/backstory.git
+cd backstory
+npm install
+npm run build
+npm link            # puts `backstory` on your PATH
+
+cd ~/your-project
 backstory init
 ```
 
-`init` writes the config, sets up ignore rules, and offers to install a hook so records accumulate while you work. The hook is installed once per machine and covers every repository, including ones you create later.
+Requires **Node 22 or newer** and a coding agent that stores sessions locally.
+
+`init` writes the config, sets up ignore rules, and offers to install a hook so records accumulate while you work. The hook installs once per machine and covers every repository, including ones you create later.
 
 ## Usage
 
-Work with your coding agent normally. No commands during a session.
+Work with your agent normally. There are no commands to run during a session.
 
 ```bash
+backstory sync                                 # distil sessions that have gone quiet
 backstory search "why is cancellation async"   # search everything
 backstory rejected --about caching             # options you dropped, and why
 backstory decisions --actor human              # decisions you made, not the agent
@@ -62,33 +102,50 @@ backstory status                               # what is pending or failed
 backstory graph                                # open the local explorer
 ```
 
-`backstory graph` serves three views from your machine with no account and no network:
+`backstory graph` serves three views from your machine, with no account and no network:
 
-- **Timeline.** A session read top to bottom. The default view.
-- **Decision map.** One decision with its rejected branches and the reason each was dropped.
-- **Project history.** Every topic worked on, with counts.
+- **Story.** What happened on this project, grouped by topic, in the order it happened.
+- **Decisions.** Every fork, ordered by how many options it recorded, each with the branches you did not take.
+- **Overview.** What the record holds and which topics are worth opening.
+
+All three share one rail of filters. Records are sorted into four kinds — *product*, *technical*, *your call*, and *working* — and only the first three are shown by default. On a real session that is 18 records out of 101.
+
+Full reference:
+
+| Command | Does |
+| --- | --- |
+| `backstory init` | set up the current repository |
+| `backstory sync` | distil sessions that have gone quiet |
+| `backstory status` | what is stored, which agents were found, what is pending |
+| `backstory search <query>` | full-text search across every record |
+| `backstory rejected [query]` | options considered and not taken |
+| `backstory decisions` | decisions, newest first |
+| `backstory show <id>` | one record in full |
+| `backstory sessions` | sessions that produced records |
+| `backstory forget <target>` | remove a record, or every record from a session |
+| `backstory graph` | open the local explorer |
+| `backstory mcp` | serve memory to a coding agent over stdio, read-only |
+| `backstory eval` | measure extraction quality against the sessions' own answer key |
+| `backstory rebuild` | rebuild the search index from the record files |
 
 ## What gets stored
 
-Records live in `.backstory/` as markdown, one file per record, tracked by git. You commit them alongside the code they explain.
+Records are markdown with YAML front matter, one file per record, in `.backstory/records/`. They are meant to be committed. They show up in your diffs and your pull requests, which is the point: a decision that changed should be visible when it changes.
 
-| Type | What it holds |
-| --- | --- |
-| Question | Something asked during planning or investigation |
-| Discovery | A fact learned about the system |
-| Decision | A choice made, with rationale and rejected alternatives |
-| Action | Implementation work that followed |
-| Outcome | What happened afterwards |
+Five record types: **question**, **discovery**, **decision**, **action**, **outcome**.
 
-Every record carries who decided. Backstory distinguishes an agent recommendation from your decision, from your override of the agent, and from an agent acting without your explicit approval. It will not claim you approved something you never saw.
+Every record carries who decided. The four states are kept apart rather than collapsed, because the difference between *you approved this* and *the agent proceeded* is the whole reason to record attribution at all:
 
-A SQLite index sits next to the records for fast search. It is gitignored and rebuilt from the records on demand. The markdown files are the source of truth.
+- `you decided`
+- `agent proposed, you accepted`
+- `agent decided, no approval`
+- `you asked` / `agent asked` for questions
 
-Records that turn out not to be worth keeping come out with `backstory forget`.
+Record IDs are derived from content, not from a counter. Two branches cannot mint the same ID for different records, and re-ingesting a session is a no-op.
 
 ## Privacy
 
-Everything runs on your machine. No account, no hosted backend, no telemetry, no external AI provider.
+Everything runs on your machine. No account, no hosted backend, no telemetry, no external AI provider. The explorer serves from localhost and loads no fonts, scripts, or stylesheets from any other host.
 
 Two filters run before anything reaches disk:
 
@@ -109,7 +166,7 @@ Codex ingests but does not distil. Its CLI was not installed on the machine this
 
 OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
 
-Adding an agent means writing a parser behind one interface. Nothing in the core changes. Agents without a local session store can pipe a transcript into `backstory ingest`.
+Adding an agent means writing a parser behind one interface. Nothing in the core changes.
 
 ## For agents
 
@@ -117,17 +174,28 @@ Backstory ships a read-only MCP server so your coding agent can consult prior de
 
 The server exposes no write tool. Records are created by distillation only.
 
+```json
+{
+  "mcpServers": {
+    "backstory": { "command": "backstory", "args": ["mcp"] }
+  }
+}
+```
+
 ## How well does it work
 
-Extraction quality is measured against an answer key the sessions provide themselves. When an agent presents an explicit list of options, that list is stored as structured data: the question, every option, and its rationale. 44 of 110 real sessions carry one, giving 178 known decision points with no hand labelling.
+Two paths, two very different answers. Conflating them would flatter the tool.
+
+**Harvested forks: deterministic.** Read verbatim from structured tool input. There is nothing to be accurate about; the data is the data. 186 forks across 485 sessions, all classified, none unresolved.
+
+**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list, that list is ground truth with no hand labelling. 44 of 110 sessions carry one, giving 178 known decision points.
 
 Measured across 7 sessions of 15 to 260 events: **precision 0.57, recall 0.68, F1 0.62**.
 
-Read that scope carefully. Recall on **large** sessions is unmeasured. An earlier run that included sessions of 17 and 27 decision points scored recall 0.06 and 0.11 on them, because the extractor capped each session at 200 events and silently ignored the rest. Chunking fixes that cap and full coverage is verified directly, but the recall it produces on a long session has not been measured, because those sessions cost 13 model calls each and were scoped out to make the run finish.
+Read that scope carefully:
 
-Of the two sessions common to both runs, one was unchanged and one improved. So the difference between the old aggregate and this one is mostly which sessions were sampled, not only the fix.
-
-Precision near 0.57 means roughly two in five records are not in the answer key. Some of those are real extractions the key does not contain, since the key only covers decisions the agent recorded as an explicit option list. Others are noise.
+- **Recall on large sessions is unmeasured.** An earlier run scored recall 0.06 and 0.11 on sessions of 17 and 27 decision points, because the extractor capped each session at 200 events and silently ignored the rest. Chunking fixed the cap and full coverage is verified directly, but the recall it produces on a long session has not been measured, because those sessions cost 13 model calls each.
+- **Precision near 0.57** means roughly two in five extracted records are not in the answer key. Some are real extractions the key does not contain, since the key only covers decisions recorded as an explicit option list. Others are noise. The four-kind filter hides most of it, but that is concealment, not accuracy.
 
 Nothing gates a release on these numbers, by design. Suppressing a useful record to protect a score is the wrong trade.
 
@@ -136,6 +204,16 @@ Run it yourself:
 ```bash
 backstory eval
 ```
+
+## Release
+
+Not published. Three things stand in the way, and one of them is a name.
+
+1. **The npm name `backstory` is taken.** It belongs to an unrelated tool that attaches AI prompts to git commits as git notes. A scoped name such as `@me-shaon/backstory` is free and keeps the word.
+2. **Every workspace package is `private: true`** at version `0.0.0`. The CLI depends on five of them, so publishing the CLI alone would install a broken package. Either publish all six under a scope, or bundle the workspace dependencies into the CLI so one package ships.
+3. **No `files` field** in any package, so a publish would ship sources, tests, and fixtures.
+
+Until then, install from source as shown above.
 
 ## Roadmap
 
@@ -155,7 +233,7 @@ Deliberately not in version 1:
 ```bash
 npm install
 npm run build      # compiles packages and builds the explorer
-npm test           # 352 tests
+npm test           # 428 tests
 npm run typecheck  # strict mode, sources and tests
 ```
 
