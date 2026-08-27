@@ -159,12 +159,12 @@ Credential redaction is best effort. A secret shaped like ordinary prose will ge
 | Agent | Read via | Ingest | Distil |
 | --- | --- | --- | --- |
 | Claude Code | session files in `~/.claude/projects/` | yes | yes |
-| Codex | rollout files in `~/.codex/sessions/` | yes | not yet |
+| Codex | rollout files in `~/.codex/sessions/` | yes | yes |
 | OpenCode | its local SQLite database, read-only | yes | yes |
 
-Codex ingests but does not distil. Its CLI was not installed on the machine this was built against, so its non-interactive mode could not be verified, and claiming an unverified capability would fail mid-sweep. `backstory status` reports this rather than failing.
-
 OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
+
+**Cursor is not supported yet.** Its chat history lives in an undocumented SQLite database, and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason, so it waits for a machine that can test it.
 
 Adding an agent means writing a parser behind one interface. Nothing in the core changes.
 
