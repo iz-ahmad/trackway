@@ -21,8 +21,31 @@ function toolCall(name: string, input: unknown, sessionId = 'ses-1'): MemoryEven
     timestamp: '2026-08-25T09:00:00Z',
     type: 'tool_call',
     actor: { type: 'agent', id: 'agent:claude-code' },
-    payload: { content: [{ type: 'tool_use', name, input }] },
+    payload: { content: [{ type: 'tool_use', id: 'tu-1', name, input }] },
     source: { adapter: 'claude-code', sessionFile: '/tmp/a.jsonl', offset: 0 },
+  };
+}
+
+/**
+ * The answer that resolves a fork.
+ *
+ * Every ground-truth test needs one now. An option list on its own says a
+ * question was asked, not that anything was decided, and the answer key is
+ * about decisions.
+ */
+function answer(text: string, question = 'Which bot protection for the deletion form?'): MemoryEvent {
+  return {
+    id: 'e-2',
+    sessionId: 'ses-1',
+    timestamp: '2026-08-25T09:00:00Z',
+    type: 'tool_result',
+    actor: { type: 'agent', id: 'agent:claude-code' },
+    payload: {
+      content: [
+        { type: 'tool_result', tool_use_id: 'tu-1', content: `The user answered: "${question}"="${text}"` },
+      ],
+    },
+    source: { adapter: 'claude-code', sessionFile: '/tmp/a.jsonl', offset: 1 },
   };
 }
 
@@ -73,10 +96,44 @@ function decision(question: string, choice: string): MemoryRecord {
 
 describe('ground truth', () => {
   it('reconstructs the question and the options not taken', () => {
-    const [expected] = extractGroundTruth([toolCall('AskUserQuestion', optionList)]);
+    const [expected] = extractGroundTruth([
+      toolCall('AskUserQuestion', optionList),
+      answer('Cloudflare Turnstile'),
+    ]);
 
     expect(expected?.question).toBe('Which bot protection for the deletion form?');
+    expect(expected?.chosen).toBe('Cloudflare Turnstile');
     expect(expected?.rejected).toEqual(['Honeypot + timing only', 'Nothing for now']);
+  });
+
+  it('expects nothing from a fork the developer dismissed', () => {
+    // 23 of 188 real forks end this way. Counting them capped recall at 0.88
+    // however good extraction became, and scored the fix that stopped writing
+    // them down as decisions as a regression.
+    const declined: MemoryEvent = {
+      ...answer('x'),
+      payload: {
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu-1', content: 'The tool use was rejected.' },
+        ],
+      },
+    };
+
+    expect(extractGroundTruth([toolCall('AskUserQuestion', optionList), declined])).toEqual([]);
+  });
+
+  it('expects nothing from an option list that was never answered', () => {
+    expect(extractGroundTruth([toolCall('AskUserQuestion', optionList)])).toEqual([]);
+  });
+
+  it('takes a freehand answer as the decision, rejecting everything offered', () => {
+    const [expected] = extractGroundTruth([
+      toolCall('AskUserQuestion', optionList),
+      answer('None of these. Rate-limit by IP instead.'),
+    ]);
+
+    expect(expected?.chosen).toBe('None of these. Rate-limit by IP instead.');
+    expect(expected?.rejected).toHaveLength(3);
   });
 
   it('reads only structured tool input, never prose', () => {
@@ -92,8 +149,11 @@ describe('ground truth', () => {
   });
 
   it('recognises the equivalent tool under other agent vocabularies', () => {
-    expect(extractGroundTruth([toolCall('ask_question', optionList)])).toHaveLength(1);
-    expect(extractGroundTruth([toolCall('request_user_input', optionList)])).toHaveLength(1);
+    const resolved = answer('Cloudflare Turnstile');
+    expect(extractGroundTruth([toolCall('ask_question', optionList), resolved])).toHaveLength(1);
+    expect(
+      extractGroundTruth([toolCall('request_user_input', optionList), resolved]),
+    ).toHaveLength(1);
   });
 
   it('ignores tool calls that are not option lists', () => {
@@ -108,13 +168,24 @@ describe('ground truth', () => {
       ],
     };
 
-    expect(extractGroundTruth([toolCall('AskUserQuestion', multi)])).toHaveLength(2);
+    expect(
+      extractGroundTruth([
+        toolCall('AskUserQuestion', multi),
+        answer('Cloudflare Turnstile'),
+        answer('Redis', 'Which storage backend?'),
+      ]),
+    ).toHaveLength(2);
   });
 
   it('skips a malformed question rather than failing the session', () => {
     const malformed = { questions: [{ question: 'No options here' }, optionList.questions[0]] };
 
-    expect(extractGroundTruth([toolCall('AskUserQuestion', malformed)])).toHaveLength(1);
+    expect(
+      extractGroundTruth([
+        toolCall('AskUserQuestion', malformed),
+        answer('Cloudflare Turnstile'),
+      ]),
+    ).toHaveLength(1);
   });
 
   it('contributes nothing from a session with no structured decision points', () => {

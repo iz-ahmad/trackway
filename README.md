@@ -270,16 +270,16 @@ Until then, install from source as shown above.
 
 ## Roadmap
 
-Version 1 covers ingestion, distillation, search, the explorer, and MCP retrieval across three agents.
+Version 1 covers ingestion, distillation, commit linking, search, the explorer, and MCP retrieval across three agents, plus a transcript format for everything else.
 
 Deliberately not in version 1:
 
 - Alerts when a rejected option becomes viable again, for example a dependency you lacked at the time and now have
+- A first-class Cursor adapter, until there is a machine to verify one against
 - Live agent hooks beyond a trigger
 - A background daemon
 - Semantic search
 - Team trust controls
-- Automatic linking of decisions to the commits that implemented them
 
 ## Development
 
