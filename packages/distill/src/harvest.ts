@@ -12,12 +12,28 @@ import type { Alternative, MemoryEvent } from '@backstory/core';
  * most of it. Measured on one real session: twelve option lists recorded, and
  * the extractor produced decisions with a median of one alternative.
  */
+/**
+ * How a fork ended.
+ *
+ * Measured across 470 sessions and 186 forks: 77% of answers name one of the
+ * offered options, 9% are typed freehand, and 12% are declined outright.
+ * Collapsing those last two into "no choice recorded" threw away a fifth of
+ * everything the tool exists to keep, and turned every declined fork into a
+ * decision that could not say what was decided.
+ */
+export type ForkOutcome =
+  /** The answer named one of the options offered. */
+  | { kind: 'chosen'; label: string }
+  /** The developer typed their own answer instead of taking an option. */
+  | { kind: 'answered'; text: string }
+  /** The fork was dismissed without an answer. It is not a decision. */
+  | { kind: 'declined' };
+
 export interface HarvestedFork {
   question: string;
   /** Every option offered, in the order offered. */
   options: Array<{ label: string; reason: string }>;
-  /** Which option the developer took, when the session recorded an answer. */
-  chosen: string | null;
+  outcome: ForkOutcome;
   /** Where in the session this happened, for provenance and ordering. */
   offset: number;
   timestamp: string;
@@ -92,36 +108,77 @@ function parseQuestion(
   return {
     question: node.question,
     options,
-    chosen: matchChoice(toolId ? answers.get(toolId) : undefined, options),
+    outcome: readOutcome(toolId ? answers.get(toolId) : undefined, node.question, options),
     offset: event.source.offset,
     timestamp: event.timestamp,
   };
 }
 
-/**
- * Finds what the developer picked.
- *
- * The result arrives as a tool result naming the chosen label, so the match is
- * on the label text rather than an index. A label the session does not name is
- * left null rather than assumed: recording the wrong choice would be worse than
- * recording none.
- */
-function matchChoice(
-  answerText: string | undefined,
-  options: ReadonlyArray<{ label: string }>,
-): string | null {
-  if (!answerText) return null;
+/** How the harness reports a fork the developer dismissed. */
+const DECLINED = [/the tool use was rejected/i, /doesn't want to proceed with this tool use/i];
 
-  const exact = options.find((option) => answerText.includes(option.label));
-  if (exact) return exact.label;
+/**
+ * Reads how a fork ended.
+ *
+ * Order matters. A declined fork's result still quotes the question and can
+ * contain an option's words, so rejection is tested before any matching.
+ */
+function readOutcome(
+  answerText: string | undefined,
+  question: string,
+  options: ReadonlyArray<{ label: string }>,
+): ForkOutcome {
+  if (!answerText) return { kind: 'declined' };
+  if (DECLINED.some((pattern) => pattern.test(answerText))) return { kind: 'declined' };
+
+  const answer = answerFor(answerText, question);
+
+  // Match against the answer alone when one was parsed. Matching the whole
+  // result text let an option's words inside the echoed question count as a
+  // choice the developer never made.
+  const haystack = answer ?? answerText;
+
+  const exact = options.find((option) => haystack.includes(option.label));
+  if (exact) return { kind: 'chosen', label: exact.label };
 
   // Labels sometimes carry a suffix the answer drops, such as "(Recommended)".
   const trimmed = options.find((option) => {
     const bare = option.label.replace(/\s*\([^)]*\)\s*$/, '').trim();
-    return bare.length > 0 && answerText.includes(bare);
+    return bare.length > 0 && haystack.includes(bare);
   });
+  if (trimmed) return { kind: 'chosen', label: trimmed.label };
 
-  return trimmed?.label ?? null;
+  // A typed answer is a real answer. It is the developer declining every option
+  // offered and saying what they wanted instead, which is worth more than the
+  // options were.
+  if (answer && answer.trim().length > 0) return { kind: 'answered', text: answer.trim() };
+
+  return { kind: 'declined' };
+}
+
+/**
+ * Pulls this question's answer out of a result that reports every question and
+ * answer as `"question"="answer"` pairs.
+ *
+ * One tool call can carry several questions, so the pair is located by its
+ * question rather than by taking the first one.
+ */
+export function answerFor(resultText: string, question: string): string | null {
+  const pairs = [...resultText.matchAll(/"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"/g)];
+  if (pairs.length === 0) return null;
+
+  const unescape = (value: string) => value.replace(/\\(.)/g, '$1');
+  const wanted = question.trim();
+
+  for (const [, asked, given] of pairs) {
+    if (asked !== undefined && unescape(asked).trim() === wanted) {
+      return given === undefined ? null : unescape(given);
+    }
+  }
+
+  // A single pair with a question we could not align is still this question's
+  // answer, because a one-question call has only one.
+  return pairs.length === 1 ? unescape(pairs[0]![2] ?? '') : null;
 }
 
 /** Maps a tool-use id to the text of its result. */
@@ -191,8 +248,9 @@ function toolUses(payload: unknown): ToolUse[] {
 
 /** Renders a harvested fork as the alternatives of a decision record. */
 export function forkAlternatives(fork: HarvestedFork): Alternative[] {
+  const taken = fork.outcome.kind === 'chosen' ? fork.outcome.label : null;
   return fork.options
-    .filter((option) => option.label !== fork.chosen)
+    .filter((option) => option.label !== taken)
     .map((option) => ({
       choice: option.label,
       status: 'rejected' as const,
@@ -212,8 +270,9 @@ export function describeForksForPrompt(forks: readonly HarvestedFork[]): string 
   if (forks.length === 0) return '';
 
   const lines = forks.map((fork, index) => {
+    const taken = fork.outcome.kind === 'chosen' ? fork.outcome.label : null;
     const options = fork.options
-      .map((option) => `     ${option.label === fork.chosen ? 'CHOSEN' : '     '} ${option.label}`)
+      .map((option) => `     ${option.label === taken ? 'CHOSEN' : '     '} ${option.label}`)
       .join('\n');
 
     return `  ${index + 1}. ${fork.question}\n${options}`;

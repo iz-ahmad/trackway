@@ -19,12 +19,15 @@ export interface DistillerOptions {
 const DEFAULT_MAX_CHUNKS = 12;
 
 /**
- * Turns a recorded fork into a decision.
+ * Turns a recorded fork into a record.
  *
  * Attribution is certain here in a way it never is from prose: the agent asked
- * and a person answered, so it is recorded as exactly that. When the session
- * did not capture which option was taken, the fork is still worth keeping for
- * its options, and the choice says so rather than guessing.
+ * and a person answered, so it is recorded as exactly that.
+ *
+ * Not every fork is a decision. A dismissed one is a question nobody answered,
+ * and calling it a decision produced records that showed the reader a fork and
+ * could not say which way it went. A freehand answer is a decision the
+ * developer wrote themselves, with every offered option rejected.
  */
 function forkToRecord(
   fork: HarvestedFork,
@@ -32,36 +35,95 @@ function forkToRecord(
   adapter: string,
   sessionFile: string,
 ): MemoryRecord {
-  return withDerivedId({
-    type: 'decision' as const,
+  const source = {
+    adapter,
+    sessionId,
+    sessionFile,
+    fromOffset: fork.offset,
+    toOffset: fork.offset,
+  };
+
+  const common = {
     sessionId,
     episodeId: null,
-    significance: 'technical' as const,
     createdAt: fork.timestamp,
-    source: {
-      adapter,
-      sessionId,
-      sessionFile,
-      fromOffset: fork.offset,
-      toOffset: fork.offset,
-    },
+    source,
+  };
+
+  if (fork.outcome.kind === 'declined') {
+    return withDerivedId({
+      ...common,
+      type: 'question' as const,
+      significance: 'technical' as const,
+      question: fork.question,
+      answer: null,
+      status: 'open' as const,
+      actor: { type: 'agent' as const, id: `agent:${adapter}` },
+    }) as MemoryRecord;
+  }
+
+  const outcome = fork.outcome;
+  const answered = outcome.kind === 'answered';
+  const choice = outcome.kind === 'answered' ? outcome.text : outcome.label;
+
+  return withDerivedId({
+    ...common,
+    type: 'decision' as const,
+    significance: 'technical' as const,
     question: fork.question,
-    choice: fork.chosen ?? 'Not recorded',
-    reason: fork.chosen
-      ? (fork.options.find((option) => option.label === fork.chosen)?.reason ??
-        'The session recorded the choice but no reasoning for it.')
-      : 'The session recorded the options but not which one was taken.',
+    choice,
+    reason: answered
+      ? 'Written by the developer rather than taken from the options offered.'
+      : (fork.options.find((option) => option.label === choice)?.reason ??
+        'The session recorded the choice but no reasoning for it.'),
     alternatives: forkAlternatives(fork),
     attribution: {
-      proposedBy: { type: 'agent' as const, id: `agent:${adapter}` },
-      acceptedBy: fork.chosen
+      // A freehand answer came from the developer, so they proposed it. The
+      // agent only proposed the options they turned down.
+      proposedBy: answered
         ? ({ type: 'human' as const, id: 'human:local' } as const)
-        : ('implicit' as const),
+        : ({ type: 'agent' as const, id: `agent:${adapter}` } as const),
+      acceptedBy: { type: 'human' as const, id: 'human:local' } as const,
     },
     status: 'accepted' as const,
     supersededBy: null,
     relationships: [],
   }) as MemoryRecord;
+}
+
+/**
+ * Drops model decisions that restate a fork already read from the session.
+ *
+ * The prompt asks the model not to re-emit these and it does anyway. That is
+ * the same lesson the discovery triage learned: a rule buried in a larger
+ * prompt is a request, not a constraint, and only code enforces it.
+ *
+ * Identity cannot catch these on its own, because a decision is identified by
+ * its choice and the model rewords the choice. The question is the reliable
+ * key: it comes verbatim from structured tool input, and two genuinely
+ * different decisions do not share one word for word.
+ */
+function withoutReharvested(
+  records: readonly MemoryRecord[],
+  forks: readonly HarvestedFork[],
+): MemoryRecord[] {
+  if (forks.length === 0) return [...records];
+
+  const asked = new Set(forks.map((fork) => normalizeSubject(fork.question)));
+
+  return records.filter(
+    (record) => record.type !== 'decision' || !asked.has(normalizeSubject(record.question)),
+  );
+}
+
+/** Matches the folding the ID derivation uses, so the two agree on sameness. */
+function normalizeSubject(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ');
 }
 
 function dedupe(records: readonly MemoryRecord[]): MemoryRecord[] {
@@ -158,6 +220,6 @@ export function createDistiller(options: DistillerOptions): Distiller {
     // between chunks and a hash of different words is a different hash.
     // Harvested forks come first so a near-duplicate from the model collapses
     // into the recorded one rather than replacing it.
-    return collapseNearDuplicates(dedupe([...harvested, ...records]));
+    return collapseNearDuplicates(dedupe([...harvested, ...withoutReharvested(records, forks)]));
   };
 }

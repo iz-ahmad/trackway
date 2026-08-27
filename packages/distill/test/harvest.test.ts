@@ -71,26 +71,70 @@ describe('harvesting a recorded fork', () => {
       toolResult('"Trigger"="Agent hook (Recommended)"'),
     ]);
 
-    expect(fork?.chosen).toBe('Agent hook (Recommended)');
+    expect(fork?.outcome).toEqual({ kind: 'chosen', label: 'Agent hook (Recommended)' });
   });
 
   it('matches a choice even when the answer drops a label suffix', () => {
     const [fork] = harvestForks([
       toolCall('AskUserQuestion', optionList),
-      toolResult('The user chose Agent hook for this.'),
+      toolResult('"Trigger"="Agent hook"'),
     ]);
 
-    expect(fork?.chosen).toBe('Agent hook (Recommended)');
+    expect(fork?.outcome).toEqual({ kind: 'chosen', label: 'Agent hook (Recommended)' });
   });
 
-  it('leaves the choice unknown rather than guessing', () => {
-    // Recording the wrong choice would be worse than recording none.
+  it('reads a freehand answer as the answer rather than discarding it', () => {
+    // Nine per cent of real forks are answered this way. Treating them as
+    // unanswered threw away the developer's own words.
     const [fork] = harvestForks([
       toolCall('AskUserQuestion', optionList),
-      toolResult('The user wants to clarify these questions.'),
+      toolResult(
+        'The user answered: "What should trigger passive distillation?"="Neither. Sweep on a timer."',
+      ),
     ]);
 
-    expect(fork?.chosen).toBeNull();
+    expect(fork?.outcome).toEqual({ kind: 'answered', text: 'Neither. Sweep on a timer.' });
+  });
+
+  it('reads every offered option as rejected when the answer was freehand', () => {
+    const [fork] = harvestForks([
+      toolCall('AskUserQuestion', optionList),
+      toolResult(
+        'The user answered: "What should trigger passive distillation?"="Neither. Sweep on a timer."',
+      ),
+    ]);
+
+    expect(forkAlternatives(fork!)).toHaveLength(3);
+  });
+
+  it('treats a dismissed fork as declined rather than as a choiceless decision', () => {
+    // Twelve per cent of real forks end this way. Recording them as decisions
+    // produced records that showed a fork and could not say which way it went.
+    const [fork] = harvestForks([
+      toolCall('AskUserQuestion', optionList),
+      toolResult(
+        "The user doesn't want to proceed with this tool use. The tool use was rejected.",
+      ),
+    ]);
+
+    expect(fork?.outcome).toEqual({ kind: 'declined' });
+  });
+
+  it('does not read an option out of the question a declined result echoes', () => {
+    const [fork] = harvestForks([
+      toolCall('AskUserQuestion', optionList),
+      toolResult(
+        'The tool use was rejected. The user said: I am still weighing Agent hook (Recommended).',
+      ),
+    ]);
+
+    expect(fork?.outcome).toEqual({ kind: 'declined' });
+  });
+
+  it('leaves a fork with no result at all declined', () => {
+    const [fork] = harvestForks([toolCall('AskUserQuestion', optionList)]);
+
+    expect(fork?.outcome).toEqual({ kind: 'declined' });
   });
 
   it('keeps a fork whose choice was never recorded, for its options', () => {
@@ -146,7 +190,7 @@ describe('harvesting a recorded fork', () => {
     const [fork] = harvestForks([toolCall('AskUserQuestion', bare)]);
 
     expect(fork?.options[0]?.reason).toBe('');
-    expect(forkAlternatives({ ...fork!, chosen: null })[0]?.reason).toContain('No reason');
+    expect(forkAlternatives(fork!)[0]?.reason).toContain('No reason');
   });
 
   it('records where in the session each fork happened', () => {
@@ -175,5 +219,37 @@ describe('telling the extractor what is already captured', () => {
 
   it('says nothing when a chunk recorded no forks', () => {
     expect(describeForksForPrompt([])).toBe('');
+  });
+});
+
+describe('describing forks to the extractor', () => {
+  const optionList = {
+    questions: [
+      {
+        question: 'What should trigger passive distillation?',
+        options: [
+          { label: 'Agent hook (Recommended)', description: 'Fires on stop.' },
+          { label: 'Pre-commit hook', description: 'Runs on commit.' },
+        ],
+      },
+    ],
+  };
+
+  it('marks the taken option when one was taken', () => {
+    const forks = harvestForks([
+      toolCall('AskUserQuestion', optionList),
+      toolResult('"What should trigger passive distillation?"="Agent hook (Recommended)"'),
+    ]);
+
+    expect(describeForksForPrompt(forks)).toContain('CHOSEN Agent hook (Recommended)');
+  });
+
+  it('marks nothing chosen when the fork was declined', () => {
+    const forks = harvestForks([
+      toolCall('AskUserQuestion', optionList),
+      toolResult('The tool use was rejected.'),
+    ]);
+
+    expect(describeForksForPrompt(forks)).not.toContain('CHOSEN');
   });
 });
