@@ -3,11 +3,9 @@ docs/plans/
 docs/brainstorms/
 engineering-memory-v1-spec.md
 
-# Backstory's own derived state. Records are tracked; these are not.
-.backstory/index.sqlite
-.backstory/index.sqlite-shm
-.backstory/index.sqlite-wal
-.backstory/cache/
+# Backstory's own output. It reads this repository's sessions like any other,
+# and the records it writes are this project's working notes, not its source.
+.backstory/
 
 # Dependencies and build output
 node_modules/
@@ -24,8 +22,8 @@ coverage/
 .env.*
 !.env.example
 
-# Scratch from the design skill's decision pages.
-.impeccable/questions/
+# Design skill working directory.
+.impeccable/
 
 # Editor and OS
 .DS_Store
