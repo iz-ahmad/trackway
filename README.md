@@ -311,4 +311,9 @@ Not yet accepting contributions. Recall needs to improve first.
 
 ## License
 
-MIT
+MIT for the code. See [LICENSE](LICENSE).
+
+The explorer ships two typefaces, both under the SIL Open Font License 1.1, and both licences travel with them in `ui/fonts/` of the published package:
+
+- **Commissioner**, copyright 2019 The Commissioner Project Authors. `OFL-Commissioner.txt`
+- **IBM Plex Mono**, copyright 2017 IBM Corp. with Reserved Font Name "Plex". `OFL-IBM-Plex-Mono.txt`
