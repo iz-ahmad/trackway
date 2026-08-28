@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:package": "npm run build && node scripts/build-package.mjs",
-    "verify:package": "node scripts/verify-package.mjs"
+    "verify:package": "node scripts/verify-package.mjs",
+    "release": "npm run build:package && npm run verify:package && npm publish packages/cli/npm"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

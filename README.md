@@ -4,7 +4,7 @@
 
 Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
-> **Status:** working, not released. The full path runs end to end. See [How well does it work](#how-well-does-it-work) for measured quality and [Release](#release) for what is left before it can be installed from a registry.
+> **Status:** v0.1.0. The full path runs end to end. Extraction quality is measured rather than guaranteed: see [How well does it work](#how-well-does-it-work).
 
 ## Why use this
 
@@ -276,8 +276,10 @@ Real dependencies stay external. `better-sqlite3` is native and cannot be bundle
 ```bash
 npm run build:package          # bundle, stage, and write the published manifest
 npm run verify:package         # install the tarball clean and exercise it
-cd packages/cli/npm && npm publish
+npm run release                # all three in order, publishing last
 ```
+
+Publish through `npm run release` rather than by hand. Publishing from `packages/cli/npm` directly runs no lifecycle script, so a stale bundle from an earlier build would ship without complaint.
 
 Every workspace package stays `private: true`. The only manifest without that flag is the one the build generates, so nothing publishes by accident.
 
