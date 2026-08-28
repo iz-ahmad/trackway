@@ -71,7 +71,16 @@ Two paths produce records, and they are not equally reliable. Trackway is explic
 
 ## Install
 
-Not yet on a registry. See [Release](#release).
+```bash
+npm install -g trackway
+
+cd ~/your-project
+trackway init
+```
+
+Requires **Node 22 or newer** and a coding agent that stores sessions locally. `better-sqlite3` is a native module, so a first install compiles or downloads a prebuilt binary.
+
+From source instead:
 
 ```bash
 git clone https://github.com/me-shaon/trackway.git
@@ -79,12 +88,7 @@ cd trackway
 npm install
 npm run build
 npm link            # puts `trackway` on your PATH
-
-cd ~/your-project
-trackway init
 ```
-
-Requires **Node 22 or newer** and a coding agent that stores sessions locally.
 
 `init` writes the config, sets up ignore rules, and offers to install a hook so records accumulate while you work. The hook installs once per machine and covers every repository, including ones you create later.
 
@@ -265,13 +269,17 @@ trackway eval
 
 ## Release
 
-Not published. Three things stand in the way, and one of them is a name.
+One package. The workspace is six, and publishing all of them would mean an npm organisation, six releases kept in version lockstep, and a user installing a CLI that drags in five scoped packages. `npm run build:package` bundles the workspace code into a single binary and stages it in `packages/cli/npm/`.
 
-1. **The npm name `trackway` is taken.** It belongs to an unrelated tool that attaches AI prompts to git commits as git notes. A scoped name such as `@me-shaon/trackway` is free and keeps the word.
-2. **Every workspace package is `private: true`** at version `0.0.0`. The CLI depends on five of them, so publishing the CLI alone would install a broken package. Either publish all six under a scope, or bundle the workspace dependencies into the CLI so one package ships.
-3. **No `files` field** in any package, so a publish would ship sources, tests, and fixtures.
+Real dependencies stay external. `better-sqlite3` is native and cannot be bundled at all, and inlining the rest would trade a shared install for a bigger tarball. The build fails if two workspace packages declare different ranges for the same dependency, because the registry only sees one and the wrong one ships silently.
 
-Until then, install from source as shown above.
+```bash
+npm run build:package          # bundle, stage, and write the published manifest
+npm run verify:package         # install the tarball clean and exercise it
+cd packages/cli/npm && npm publish
+```
+
+Every workspace package stays `private: true`. The only manifest without that flag is the one the build generates, so nothing publishes by accident.
 
 ## Roadmap
 

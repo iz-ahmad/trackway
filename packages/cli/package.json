@@ -16,7 +16,7 @@
     "@trackway/core": "*",
     "@trackway/distill": "*",
     "commander": "^12.1.0",
-    "yaml": "^2.5.0",
+    "yaml": "^2.9.0",
     "@trackway/server": "*"
   }
 }

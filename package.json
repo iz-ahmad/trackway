@@ -12,12 +12,25 @@
     "build": "tsc --build && npm run build --workspace @trackway/ui",
     "typecheck": "tsc --build --force && tsc -p tsconfig.test.json && tsc -p packages/ui/tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:package": "npm run build && node scripts/build-package.mjs",
+    "verify:package": "node scripts/verify-package.mjs"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "esbuild": "^0.21.5"
+  },
+  "author": "Ahmed shamim <shaon.cse81@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/me-shaon/trackway.git"
+  },
+  "homepage": "https://github.com/me-shaon/trackway#readme",
+  "bugs": {
+    "url": "https://github.com/me-shaon/trackway/issues"
   }
 }

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { startExplorer } from '@trackway/server';
 import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
@@ -11,9 +12,24 @@ import type { Io } from './index.js';
  * Shipping it built is what keeps installation free of a toolchain: the user
  * gets a working explorer from `npm install`, with no build step of their own.
  */
+/**
+ * Where the built explorer lives.
+ *
+ * Two layouts, because the same code runs from both. Published, the bundle
+ * sits in `bin/` and the explorer beside it in `ui/`. In this repository the
+ * CLI is compiled to `packages/cli/dist/commands/` and the explorer is built
+ * into `packages/ui/dist`. Checking for the file rather than guessing means a
+ * wrong answer surfaces here instead of as an empty page.
+ */
 function resolveUiDir(): string {
   const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, '..', '..', '..', 'ui', 'dist');
+
+  const candidates = [
+    resolve(here, '..', 'ui'), // published: bin/../ui
+    resolve(here, '..', '..', '..', 'ui', 'dist'), // this repository
+  ];
+
+  return candidates.find((path) => existsSync(join(path, 'index.html'))) ?? candidates[0]!;
 }
 
 export interface GraphOptions {
