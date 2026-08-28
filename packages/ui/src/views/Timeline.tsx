@@ -96,15 +96,30 @@ function groupByEpisode(records: readonly MemoryRecord[], episodes: readonly Epi
   const buckets = new Map<string, MemoryRecord[]>();
 
   for (const record of records) {
-    const key = record.episodeId ?? '__ungrouped';
+    const key = record.episodeId ?? UNGROUPED;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(record);
     else buckets.set(key, [record]);
   }
 
   return [...buckets.entries()]
-    .map(([id, list]) => ({ id, title: titles.get(id) ?? 'Everything else', records: list }))
+    .map(([id, list]) => ({ id, title: headingFor(id, titles), records: list }))
     .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+}
+
+const UNGROUPED = '__ungrouped';
+
+/**
+ * Two different states used to read as one heading.
+ *
+ * A record with no topic belongs under "Everything else". A record whose topic
+ * has no title means `episodes.yml` was missing or unreadable, and calling that
+ * "Everything else" too renders every group under the same heading while
+ * looking deliberate. Showing the bare id says which state this is.
+ */
+function headingFor(id: string, titles: ReadonlyMap<string, string>): string {
+  if (id === UNGROUPED) return 'Everything else';
+  return titles.get(id) ?? id;
 }
 
 function toggle<T>(set: Set<T>, value: T): Set<T> {
