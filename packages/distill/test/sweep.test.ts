@@ -10,6 +10,7 @@ import {
   isQuiet,
   loadState,
   purgeCache,
+  markPartial,
   runSweep,
   saveState,
   stateKey,
@@ -508,5 +509,57 @@ describe('cache retention', () => {
 
   it('does nothing when there is no cache yet', async () => {
     expect(await purgeCache(join(cacheDir, 'absent'), 30, NOW)).toEqual({ purged: 0, kept: 0 });
+  });
+});
+
+describe('a session where only part could be read', () => {
+  function setup() {
+    const events = new Map([['ses-1', [eventAt(0), eventAt(1), eventAt(2)]]]);
+    return new AdapterRegistry([new FakeAdapter('fake', [descriptor()], events)]);
+  }
+
+  const partial = (failures: number): Distiller =>
+    async () => markPartial([recordFor('ses-1', 'kept')], failures);
+
+  it('keeps what was read', async () => {
+    const result = await runSweep(setup(), partial(1), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+    });
+
+    expect(result.swept[0]?.records).toHaveLength(1);
+  });
+
+  it('reports how much of it failed rather than passing silently', async () => {
+    const result = await runSweep(setup(), partial(2), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+    });
+
+    expect(result.swept[0]?.partial).toBe(2);
+  });
+
+  it('leaves the watermark alone, so the failed region is read again', async () => {
+    // Advancing past it skipped those events forever with nothing said. Record
+    // IDs derive from content, so re-reading costs a pass and no duplicates.
+    const options = { cacheDir, quietWindowMinutes: 15, now: NOW };
+
+    await runSweep(setup(), partial(1), options);
+    const after = await loadState(cacheDir);
+    const key = Object.keys(after.sessions)[0]!;
+
+    expect(after.sessions[key]?.watermark).toBe(-1);
+  });
+
+  it('advances normally when every region was read', async () => {
+    const options = { cacheDir, quietWindowMinutes: 15, now: NOW };
+
+    await runSweep(setup(), async () => [recordFor('ses-1', 'a')], options);
+    const after = await loadState(cacheDir);
+    const key = Object.keys(after.sessions)[0]!;
+
+    expect(after.sessions[key]?.watermark).toBe(2);
   });
 });

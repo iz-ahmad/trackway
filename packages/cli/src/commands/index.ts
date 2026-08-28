@@ -152,6 +152,16 @@ export async function syncCommand(
     io.out(`  deferred:    ${result.sweep.deferred} (run again to continue)`);
   }
 
+  // A session read in several calls can lose one of them after retries. The
+  // records that did come back are kept, and the region that failed is read
+  // again next sweep rather than skipped in silence.
+  const partial = result.sweep.swept.filter((session) => (session.partial ?? 0) > 0);
+  if (partial.length > 0) {
+    io.out(
+      `  incomplete:  ${partial.length} session(s) had a region that could not be read; run again to retry it`,
+    );
+  }
+
   for (const failure of result.sweep.failures) {
     io.err(`  failed: ${failure.sessionId.slice(0, 12)}: ${truncate(failure.reason, 90)}`);
   }

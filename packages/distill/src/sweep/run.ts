@@ -25,6 +25,29 @@ export type Distiller = (input: {
   fromOffset: number;
 }) => Promise<MemoryRecord[] | null>;
 
+/**
+ * Marks records that came from a session where some region could not be read.
+ *
+ * A session distilled in several calls can have one of them fail after retries
+ * while the rest succeed. Those records are worth keeping, but the watermark
+ * must not move past the part that failed, or those events are skipped forever
+ * and nothing ever says so. Record IDs derive from content, so re-reading the
+ * region on the next sweep costs a second pass and creates no duplicates.
+ */
+export const PARTIAL = Symbol.for('trackway.partialDistillation');
+
+export function markPartial(records: MemoryRecord[], failures: number): MemoryRecord[] {
+  return Object.defineProperty(records, PARTIAL, {
+    value: failures,
+    enumerable: false,
+  }) as MemoryRecord[];
+}
+
+export function partialFailures(records: MemoryRecord[] | null): number {
+  const value = records === null ? undefined : (records as unknown as Record<symbol, unknown>)[PARTIAL];
+  return typeof value === 'number' ? value : 0;
+}
+
 export interface SweptSession {
   sessionId: string;
   adapter: string;
@@ -32,6 +55,8 @@ export interface SweptSession {
   eventCount: number;
   /** True when the adapter cannot distil, so events were read but not turned into records. */
   undistilled: boolean;
+  /** How many regions failed after retries. Their events are retried next sweep. */
+  partial?: number;
 }
 
 export interface SweepFailure {
@@ -140,15 +165,31 @@ export async function runSweep(
         continue;
       }
 
+      const unread = partialFailures(records);
+
       result.swept.push({
         sessionId: descriptor.sessionId,
         adapter: descriptor.adapter,
         records,
         eventCount: events.length,
         undistilled: false,
+        ...(unread > 0 ? { partial: unread } : {}),
       });
 
-      recordSuccess(state, key, descriptor, highestOffset, now);
+      if (unread > 0) {
+        // Keep what was read, and leave the watermark where it was so the part
+        // that failed is read again next time rather than skipped in silence.
+        recordFailure(
+          state,
+          key,
+          descriptor,
+          previous,
+          now,
+          new Error(`${unread} of the session could not be read and will be retried`),
+        );
+      } else {
+        recordSuccess(state, key, descriptor, highestOffset, now);
+      }
     } catch (error) {
       result.failures.push({
         sessionId: descriptor.sessionId,

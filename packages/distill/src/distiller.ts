@@ -3,9 +3,9 @@ import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
 import { describeForksForPrompt, forkAlternatives, harvestForks, type HarvestedFork } from './harvest.js';
 import { collapseNearDuplicates } from './dedupe.js';
 import { buildPrompt } from './prompts/extract.js';
-import type { DistillRunner } from './runner/contract.js';
+import { RunnerError, type DistillRunner } from './runner/contract.js';
 import { toRecords } from './runner/validate.js';
-import type { Distiller } from './sweep/run.js';
+import { markPartial, type Distiller } from './sweep/run.js';
 
 export interface DistillerOptions {
   runner: DistillRunner;
@@ -13,10 +13,44 @@ export interface DistillerOptions {
   chunkSize?: number;
   /** Caps calls per session so one enormous session cannot run away. */
   maxChunks?: number;
+  /** Attempts per chunk before it is given up on. Defaults to 3. */
+  maxAttempts?: number;
+  /** Base delay between attempts. Exposed so tests need not wait it out. */
+  retryDelayMs?: number;
   onProgress?: (message: string) => void;
 }
 
 const DEFAULT_MAX_CHUNKS = 12;
+
+/**
+ * How many times one chunk may be sent before it is given up on.
+ *
+ * A chunk of this session's size takes 27 to 70 seconds against a 300 second
+ * limit, so a timeout does not mean the request was too large. It means
+ * something transient went wrong, which is the one case worth trying again.
+ * Raising the limit was tried first, from 120 seconds to 300, and a later run
+ * still lost a session: more patience does not help a request that stalled.
+ */
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+/** Grows between attempts so a struggling machine is not hit at the same rate. */
+const RETRY_BACKOFF_MS = 2_000;
+
+/**
+ * Failures worth another attempt.
+ *
+ * A missing binary will still be missing in two seconds, and retrying it
+ * three times only makes the wait before the real message longer. A timeout or
+ * a crashed process is circumstance rather than a verdict. Malformed output is
+ * retried too, because the model is sampled and a second draw often parses.
+ */
+const TRANSIENT: ReadonlySet<string> = new Set(['timeout', 'exit', 'output']);
+
+function isWorthRetrying(error: unknown): boolean {
+  return error instanceof RunnerError && TRANSIENT.has(error.kind);
+}
+
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Turns a recorded fork into a record.
@@ -190,23 +224,41 @@ export function createDistiller(options: DistillerOptions): Distiller {
         ...(inChunk.length > 0 ? { alreadyCaptured: describeForksForPrompt(inChunk) } : {}),
       });
 
-      try {
-        const output = await options.runner.run(prompt);
+      const attempts = Math.max(1, options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
+      let lastError: unknown;
 
-        records.push(
-          ...toRecords(output, {
-            sessionId: descriptor.sessionId,
-            adapter: descriptor.adapter,
-            sessionFile: descriptor.sessionFile,
-            fromOffset: Math.max(chunk.fromOffset, 0),
-            toOffset: chunk.toOffset,
-            createdAt: chunk.events.at(-1)?.timestamp ?? now().toISOString(),
-          }),
-        );
-      } catch (error) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          const output = await options.runner.run(prompt);
+
+          records.push(
+            ...toRecords(output, {
+              sessionId: descriptor.sessionId,
+              adapter: descriptor.adapter,
+              sessionFile: descriptor.sessionFile,
+              fromOffset: Math.max(chunk.fromOffset, 0),
+              toOffset: chunk.toOffset,
+              createdAt: chunk.events.at(-1)?.timestamp ?? now().toISOString(),
+            }),
+          );
+          lastError = undefined;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt >= attempts || !isWorthRetrying(error)) break;
+
+          options.onProgress?.(
+            `session ${descriptor.sessionId}: chunk ${chunk.index + 1} of ${chunk.total} ` +
+              `failed (${(error as RunnerError).kind}), retrying ${attempt + 1} of ${attempts}`,
+          );
+          await wait((options.retryDelayMs ?? RETRY_BACKOFF_MS) * attempt);
+        }
+      }
+
+      if (lastError !== undefined) {
         // One bad chunk must not cost the whole session. A long session is
         // exactly where losing everything hurts most.
-        failures.push(error);
+        failures.push(lastError);
       }
     }
 
@@ -221,6 +273,12 @@ export function createDistiller(options: DistillerOptions): Distiller {
     // between chunks and a hash of different words is a different hash.
     // Harvested forks come first so a near-duplicate from the model collapses
     // into the recorded one rather than replacing it.
-    return collapseNearDuplicates(dedupe([...harvested, ...withoutReharvested(records, forks)]));
+    const distilled = collapseNearDuplicates(
+      dedupe([...harvested, ...withoutReharvested(records, forks)]),
+    );
+
+    // Some chunks failed and others did not. Say so, so the sweep can keep
+    // these records without treating the session as fully read.
+    return failures.length > 0 ? markPartial(distilled, failures.length) : distilled;
   };
 }

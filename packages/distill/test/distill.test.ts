@@ -344,7 +344,7 @@ describe('the distiller', () => {
     };
 
     await expect(
-      createDistiller({ runner: failing })({ descriptor, events: [eventAt(0, 'a')], fromOffset: -1 }),
+      createDistiller({ runner: failing, retryDelayMs: 0 })({ descriptor, events: [eventAt(0, 'a')], fromOffset: -1 }),
     ).rejects.toThrow(RunnerError);
   });
 });
@@ -451,7 +451,7 @@ describe('chunking a long session', () => {
       },
     };
 
-    const records = await createDistiller({ runner, chunkSize: 50 })({
+    const records = await createDistiller({ runner, chunkSize: 50, retryDelayMs: 0 })({
       descriptor,
       events: eventsN(400),
       fromOffset: -1,
@@ -473,7 +473,7 @@ describe('chunking a long session', () => {
       },
     };
 
-    const records = await createDistiller({ runner, chunkSize: 50 })({
+    const records = await createDistiller({ runner, chunkSize: 50, retryDelayMs: 0 })({
       descriptor,
       events: eventsN(400),
       fromOffset: -1,
@@ -498,7 +498,7 @@ describe('chunking a long session', () => {
       },
     };
 
-    const records = await createDistiller({ runner, chunkSize: 50 })({
+    const records = await createDistiller({ runner, chunkSize: 50, retryDelayMs: 0 })({
       descriptor,
       events: eventsN(300),
       fromOffset: -1,
@@ -521,7 +521,7 @@ describe('chunking a long session', () => {
     // The original error type survives, because the sweep distinguishes a
     // runner failure from invalid model output.
     await expect(
-      createDistiller({ runner, chunkSize: 50 })({
+      createDistiller({ runner, chunkSize: 50, retryDelayMs: 0 })({
         descriptor,
         events: eventsN(300),
         fromOffset: -1,
@@ -871,5 +871,98 @@ describe('answered questions become decisions', () => {
 
     const decision = records.find((r) => r.type === 'decision');
     expect(decision?.type === 'decision' && decision.attribution.proposedBy.type).toBe('human');
+  });
+});
+
+describe('a chunk that fails for a passing reason', () => {
+  const events = [eventAt(0, 'a'), eventAt(1, 'b')];
+
+  function flaky(failures: number, kind: 'timeout' | 'exit' | 'output' | 'unavailable') {
+    let calls = 0;
+    return {
+      id: 'claude-code',
+      isAvailable: async () => ({ available: true }),
+      calls: () => calls,
+      run: async () => {
+        calls += 1;
+        if (calls <= failures) throw new RunnerError('claude-code', kind, 'boom');
+        return JSON.stringify({ questions: [], discoveries: [], decisions: [], actions: [], outcomes: [] });
+      },
+    };
+  }
+
+  it('tries again after a timeout instead of losing the chunk', async () => {
+    // Measured on the session that failed a real eval run: chunks take 27 to
+    // 70 seconds against a 300 second limit, so a timeout is circumstance
+    // rather than a request that was too large. Raising the limit was tried
+    // first and a later run still lost a session.
+    const runner = flaky(1, 'timeout');
+    const distil = createDistiller({ runner, maxAttempts: 3, retryDelayMs: 0 });
+
+    await distil({ descriptor, events, fromOffset: 0 });
+
+    expect(runner.calls()).toBe(2);
+  });
+
+  it('tries again after the process crashes', async () => {
+    const runner = flaky(2, 'exit');
+    await createDistiller({ runner, maxAttempts: 3, retryDelayMs: 0 }).call(null, {
+      descriptor,
+      events,
+      fromOffset: 0,
+    });
+
+    expect(runner.calls()).toBe(3);
+  });
+
+  it('tries again on unparseable output, because the model is sampled', async () => {
+    const runner = flaky(1, 'output');
+    await createDistiller({ runner, maxAttempts: 3, retryDelayMs: 0 }).call(null, {
+      descriptor,
+      events,
+      fromOffset: 0,
+    });
+
+    expect(runner.calls()).toBe(2);
+  });
+
+  it('does not retry a missing binary, which will still be missing', async () => {
+    const runner = flaky(9, 'unavailable');
+
+    await expect(
+      createDistiller({ runner, maxAttempts: 3, retryDelayMs: 0 }).call(null, {
+        descriptor,
+        events,
+        fromOffset: 0,
+      }),
+    ).rejects.toThrow(RunnerError);
+
+    expect(runner.calls()).toBe(1);
+  });
+
+  it('gives up after the last attempt rather than trying forever', async () => {
+    const runner = flaky(99, 'timeout');
+
+    await expect(
+      createDistiller({ runner, maxAttempts: 2, retryDelayMs: 0 }).call(null, {
+        descriptor,
+        events,
+        fromOffset: 0,
+      }),
+    ).rejects.toThrow(RunnerError);
+
+    expect(runner.calls()).toBe(2);
+  });
+
+  it('says it is retrying, so a long wait is explained', async () => {
+    const messages: string[] = [];
+    await createDistiller({
+      runner: flaky(1, 'timeout'),
+      maxAttempts: 3,
+      retryDelayMs: 0,
+      onProgress: (message) => messages.push(message),
+    }).call(null, { descriptor, events, fromOffset: 0 });
+
+    expect(messages.join('\n')).toContain('retrying');
   });
 });
