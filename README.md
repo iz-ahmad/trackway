@@ -6,6 +6,18 @@ Trackway reads the session files your coding agent already writes to disk and tu
 
 > **v0.1.0.** Everything runs end to end. Extraction quality is measured rather than assumed: see [How well does it work](#how-well-does-it-work).
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/me-shaon/trackway/main/docs/explorer-dark.png">
+    <img
+      alt="The Trackway explorer showing one recorded decision: the question that was settled, the option chosen with the reasoning for it, four options that were not taken each with the reason it was dropped, who decided, and the two commits the decision shipped in."
+      src="https://raw.githubusercontent.com/me-shaon/trackway/main/docs/explorer-light.png"
+      width="900">
+  </picture>
+</p>
+
+<p align="center"><sub><code>trackway graph</code>, run against this repository's own history.</sub></p>
+
 ## Why use this
 
 You plan a feature with an agent. You weigh three approaches and pick one. The argument against the two you dropped gets written down at the moment you are deciding, while you genuinely do not know the answer yet. Then it evaporates.
