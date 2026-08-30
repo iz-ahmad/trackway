@@ -16,3 +16,4 @@ export * from './dedupe.js';
 export * from './organize.js';
 export * from './harvest.js';
 export * from './triage.js';
+export * from './eval/precision.js';

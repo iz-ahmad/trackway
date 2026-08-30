@@ -3,6 +3,8 @@ import type { SessionDescriptor } from '@trackway/core';
 import type { Distiller } from '../sweep/run.js';
 import { extractGroundTruth } from './ground-truth.js';
 import { describeForJudge, type Judge } from './judge.js';
+import { judgePrecision } from './precision.js';
+import type { DistillRunner } from '../runner/contract.js';
 import { aggregate, scoreSession, type Scores, type SessionScore } from './score.js';
 
 export interface EvalOptions {
@@ -16,12 +18,30 @@ export interface EvalOptions {
    * reworded extraction and under-reports badly.
    */
   judge?: Judge;
+  /**
+   * Judges whether each extracted decision is true of its session.
+   *
+   * The answer key cannot do this. It only holds decisions a session recorded
+   * as an explicit option list, so a correct extraction of a decision made in
+   * conversation counts against the key's precision. Without this, the score
+   * falls as the extractor finds more real decisions.
+   */
+  precisionRunner?: DistillRunner;
   onProgress?: (message: string) => void;
 }
 
 export interface EvalReport {
   sessions: SessionScore[];
   totals: Scores;
+  /** Present when a precision runner was supplied. */
+  judgedPrecision?: {
+    sound: number;
+    distorted: number;
+    invented: number;
+    precision: number;
+    /** Records the judge declined to rule on, excluded rather than assumed sound. */
+    unjudged: number;
+  };
   /** Sessions carrying an answer key, whether or not they were scored. */
   candidates: number;
   failures: Array<{ sessionId: string; reason: string }>;
@@ -52,6 +72,7 @@ export async function runEval(options: EvalOptions): Promise<EvalReport> {
   const batch = withKey.slice(0, options.limit ?? withKey.length);
   const sessions: SessionScore[] = [];
   const failures: EvalReport['failures'] = [];
+  const precision = { sound: 0, distorted: 0, invented: 0, unjudged: 0 };
 
   for (const [index, item] of batch.entries()) {
     options.onProgress?.(
@@ -70,6 +91,14 @@ export async function runEval(options: EvalOptions): Promise<EvalReport> {
       sessions.push(
         scoreSession(item.descriptor.sessionId, item.expected, records ?? [], judged),
       );
+
+      if (options.precisionRunner) {
+        const verdicts = await judgePrecision(options.precisionRunner, records ?? [], events);
+        precision.sound += verdicts.sound;
+        precision.distorted += verdicts.distorted;
+        precision.invented += verdicts.invented;
+        precision.unjudged += decisions.length - verdicts.judged.length;
+      }
     } catch (error) {
       failures.push({
         sessionId: item.descriptor.sessionId,
@@ -78,5 +107,20 @@ export async function runEval(options: EvalOptions): Promise<EvalReport> {
     }
   }
 
-  return { sessions, totals: aggregate(sessions), candidates: withKey.length, failures };
+  const ruled = precision.sound + precision.distorted + precision.invented;
+
+  return {
+    sessions,
+    totals: aggregate(sessions),
+    candidates: withKey.length,
+    failures,
+    ...(options.precisionRunner
+      ? {
+          judgedPrecision: {
+            ...precision,
+            precision: ruled === 0 ? 0 : Number((precision.sound / ruled).toFixed(3)),
+          },
+        }
+      : {}),
+  };
 }

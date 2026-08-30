@@ -131,6 +131,7 @@ async function main(): Promise<void> {
     .command('eval')
     .description('measure extraction quality against sessions that carry their own answer key')
     .option('-n, --limit <n>', 'how many sessions to score', Number)
+    .option('--key-only', 'skip judging, report only agreement with the answer key')
     .option('--json', 'machine-readable output')
     .action(async (options) => process.exit(await evalCommandEntry(options, consoleIo)));
 

@@ -11,6 +11,8 @@ import type { Io } from './index.js';
 export interface EvalCommandOptions {
   limit?: number;
   json?: boolean;
+  /** Skip judging, and report only agreement with the answer key. */
+  keyOnly?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export async function evalCommand(
     adapter: new ClaudeCodeAdapter(),
     distill: createDistiller({ runner }),
     judge: createJudge(runner),
+    ...(options.keyOnly ? {} : { precisionRunner: runner }),
     limit,
     ...(options.json ? {} : { onProgress: (message) => io.out(message) }),
   });
@@ -52,6 +55,20 @@ export async function evalCommand(
 
   io.out(`\nSessions carrying an answer key: ${report.candidates}`);
   io.out(summarize(report.sessions));
+
+  if (report.judgedPrecision) {
+    const { sound, distorted, invented, unjudged, precision } = report.judgedPrecision;
+    io.out(`\nJudged precision: ${precision.toFixed(2)}`);
+    io.out(`  sound      ${sound}   the session contains it and the record is right`);
+    io.out(`  distorted  ${distorted}   the decision is real, the record gets it wrong`);
+    io.out(`  invented   ${invented}   nothing in the session supports it`);
+    if (unjudged > 0) io.out(`  unjudged   ${unjudged}   excluded rather than assumed sound`);
+    io.out(
+      '\nThe rate above the session table is agreement with the option-list subset,\n' +
+        'not precision: a decision made in conversation counts against it however\n' +
+        'correct the record is.',
+    );
+  }
 
   if (report.failures.length > 0) {
     io.out(`\nFailed to score ${report.failures.length}:`);
