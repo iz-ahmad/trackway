@@ -109,7 +109,20 @@ export interface Episode {
   firstAt: string;
 }
 
+/**
+ * Where this repository's commits can be read.
+ *
+ * `commitUrl` is a template with COMMIT standing in for the hash, so the UI
+ * never builds a host or a path of its own. Absent when there is no remote, or
+ * when it points somewhere with no known web address.
+ */
+export interface Forge {
+  host: string;
+  commitUrl: string;
+}
+
 export interface Overview {
+  forge?: Forge;
   sessions: SessionSummary[];
   episodes: Episode[];
   counts: {

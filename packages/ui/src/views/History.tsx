@@ -62,12 +62,36 @@ export function History({
 
   return (
     <>
-      <p className="lede">
-        <b>{records.length}</b> records from <b>{sessions}</b> {plural(sessions, 'session')}.{' '}
-        <b>{foreground}</b> of them carry this project's own history rather than the agent's working
-        detail. Across all <b>{decisions.length}</b> {plural(decisions.length, 'decision')},{' '}
-        <b>{kept}</b> {plural(kept, 'option')} {kept === 1 ? 'was' : 'were'} recorded and not taken.
-      </p>
+      {/*
+        A row of figures, not a paragraph.
+        
+        Four equal-weight numbers were tried first and are worse: 18 is a subset
+        of 101 and 48 belongs to the 30, so presenting them as peers invites a
+        comparison that means nothing. Each figure keeps the clause that says
+        what it is a figure of, which is the part a paragraph buries.
+      */}
+      <dl className="figures">
+        <div className="figure">
+          <dt>{records.length}</dt>
+          <dd>
+            records from {sessions} {plural(sessions, 'session')}
+          </dd>
+        </div>
+        <div className="figure">
+          <dt>{foreground}</dt>
+          <dd>worth reading, the rest is the agent's working detail</dd>
+        </div>
+        <div className="figure">
+          <dt>{decisions.length}</dt>
+          <dd>{plural(decisions.length, 'decision')} recorded</dd>
+        </div>
+        <div className="figure">
+          <dt>{kept}</dt>
+          <dd>
+            {plural(kept, 'option')} those decisions turned down
+          </dd>
+        </div>
+      </dl>
 
       <h2 className="section-title">What the records are</h2>
       <div className="rows">

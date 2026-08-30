@@ -1,4 +1,5 @@
 import {
+  detectForge,
   effectiveSignificance,
   getRecord,
   isForeground,
@@ -18,6 +19,8 @@ export interface ApiOptions {
   db: IndexDatabase;
   /** Where episodes.yml lives. Absent in tests that only exercise records. */
   storeDir?: string;
+  /** Working tree the records describe, so commits can be linked to their forge. */
+  repoRoot?: string;
 }
 
 export interface TimelineEntry {
@@ -155,7 +158,13 @@ export function createApi(options: ApiOptions): Hono {
       .filter((episode) => episode.count > 0)
       .sort((a, b) => (a.firstAt < b.firstAt ? -1 : 1));
 
+    // Resolved per request rather than stored on a record. A remote can be
+    // added or moved long after a record is written, and a URL baked into the
+    // record would then be wrong with nothing to correct it.
+    const forge = options.repoRoot ? await detectForge(options.repoRoot) : null;
+
     return c.json({
+      ...(forge ? { forge: { host: forge.host, commitUrl: forge.commitUrl('COMMIT') } } : {}),
       sessions,
       episodes: grouped,
       byKind,

@@ -2,13 +2,13 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { api } from '../api.js';
 import { RecordRow } from '../RecordRow.js';
 import { plural } from './Timeline.js';
-import type { MemoryRecord } from '../types.js';
+import type { Forge, MemoryRecord } from '../types.js';
 
 /**
  * Answering "why is this like this?" is the question the product exists for, so
  * search returns whole records rather than links to them.
  */
-export function Search({ query }: { query: string }): ReactElement {
+export function Search({ query, forge }: { query: string; forge?: Forge | undefined }): ReactElement {
   const [records, setRecords] = useState<MemoryRecord[]>([]);
   const [searched, setSearched] = useState(false);
 
@@ -60,7 +60,7 @@ export function Search({ query }: { query: string }): ReactElement {
         {records.length} {plural(records.length, 'result')} for “{query}”
       </p>
       {records.map((record) => (
-        <RecordRow key={record.id} record={record} />
+        <RecordRow key={record.id} record={record} forge={forge} />
       ))}
     </>
   );

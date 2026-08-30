@@ -48,6 +48,7 @@ export async function graphCommand(
     db,
     storeDir: workspace.storeDir,
     uiDir: resolveUiDir(),
+    repoRoot: workspace.repoRoot,
     ...(options.port === undefined ? {} : { port: options.port }),
   });
 

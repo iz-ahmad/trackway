@@ -730,6 +730,23 @@ code {
   font-size: 14px;
   line-height: 1.5;
   color: var(--ink-2);
+  text-decoration: none;
+  transition: color 0.18s var(--ease);
+}
+
+/* Only a linked commit reacts. One with nowhere to go must not look clickable. */
+a.commit:hover {
+  color: var(--ink);
+}
+
+a.commit:hover code {
+  color: var(--ink-2);
+  border-bottom-color: var(--ink-3);
+}
+
+a.commit code {
+  border-bottom: 1px solid var(--hair-2);
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
 }
 
 .commit code {
@@ -815,20 +832,43 @@ code {
 */
 /* ─── overview ──────────────────────────────────────────────────────────── */
 
-.lede {
-  margin: 0 0 46px;
-  font-size: 25px;
-  font-weight: 200;
-  line-height: 1.45;
-  letter-spacing: -0.014em;
-  color: var(--ink-2);
-  max-width: 36ch;
-  text-wrap: balance;
+/* ─── figures ────────────────────────────────────────────────────────────── */
+
+/*
+  Four figures on one row, each keeping the clause that says what it counts.
+  The number leads at display size and the clause sits under it at reading
+  size, so the row scans as numbers and reads as sentences.
+*/
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 26px 34px;
+  margin: 0 0 48px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--hair);
 }
 
-.lede b {
-  font-weight: 400;
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.figure dt {
+  font-size: 34px;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.figure dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 26ch;
 }
 
 .section-title {
@@ -1107,9 +1147,6 @@ button.row:focus-visible .name {
     top: 24px;
   }
 
-  .lede {
-    font-size: 21px;
-  }
 
   .row {
     grid-template-columns: minmax(0, 1fr) auto;

@@ -9,6 +9,7 @@ import { createApi } from './api.js';
 export interface ExplorerOptions {
   db: IndexDatabase;
   storeDir?: string;
+  repoRoot?: string;
   /** Directory holding the prebuilt explorer. */
   uiDir: string;
   port?: number;
@@ -21,7 +22,9 @@ export interface RunningExplorer {
   close: () => Promise<void>;
 }
 
-export function createExplorerApp(options: Pick<ExplorerOptions, 'db' | 'uiDir' | 'storeDir'>): Hono {
+export function createExplorerApp(
+  options: Pick<ExplorerOptions, 'db' | 'uiDir' | 'storeDir' | 'repoRoot'>,
+): Hono {
   const app = new Hono();
 
   // The records endpoint returns the whole store in one response, and record
@@ -29,7 +32,14 @@ export function createExplorerApp(options: Pick<ExplorerOptions, 'db' | 'uiDir' 
   // store: 1.8 MB uncompressed, 55 KB gzipped.
   app.use('*', compress());
 
-  app.route('/', createApi({ db: options.db, ...(options.storeDir ? { storeDir: options.storeDir } : {}) }));
+  app.route(
+    '/',
+    createApi({
+      db: options.db,
+      ...(options.storeDir ? { storeDir: options.storeDir } : {}),
+      ...(options.repoRoot ? { repoRoot: options.repoRoot } : {}),
+    }),
+  );
 
   if (existsSync(options.uiDir)) {
     app.use('/assets/*', serveStatic({ root: options.uiDir }));

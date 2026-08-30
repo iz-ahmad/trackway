@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { RecordRow } from '../RecordRow.js';
 import { FirstRun, plural } from './Timeline.js';
-import type { DecisionRecord, MemoryRecord } from '../types.js';
+import type { DecisionRecord, Forge, MemoryRecord } from '../types.js';
 
 /**
  * Every fork, richest first.
@@ -16,9 +16,10 @@ interface Props {
   records: MemoryRecord[];
   /** Every decision in the session, so the count says what it is a count of. */
   all: MemoryRecord[];
+  forge?: Forge | undefined;
 }
 
-export function Decisions({ records, all }: Props): ReactElement {
+export function Decisions({ records, all, forge }: Props): ReactElement {
   const decisions = records
     .filter(isDecision)
     .sort((a, b) => b.alternatives.length - a.alternatives.length);
@@ -55,7 +56,7 @@ export function Decisions({ records, all }: Props): ReactElement {
       </p>
 
       {decisions.map((decision) => (
-        <RecordRow key={decision.id} record={decision} />
+        <RecordRow key={decision.id} record={decision} forge={forge} />
       ))}
     </>
   );

@@ -9,6 +9,7 @@ import { Loading, Problem, Timeline, plural } from './views/Timeline.js';
 import {
   kindOf,
   type Episode,
+  type Forge,
   type MemoryRecord,
   type SessionSummary,
   type Significance,
@@ -39,6 +40,7 @@ export function App(): ReactElement {
 
   const [records, setRecords] = useState<MemoryRecord[] | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [forge, setForge] = useState<Forge | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   const [active, setActive] = useState<Set<Significance>>(new Set(LIT));
@@ -54,6 +56,7 @@ export function App(): ReactElement {
       .then(([r, o]) => {
         setRecords(r.records);
         setEpisodes(o.episodes);
+        setForge(o.forge);
       })
       .catch((cause: unknown) => setError(String(cause)));
   }, [sessionId]);
@@ -160,9 +163,9 @@ export function App(): ReactElement {
           ) : records === null ? (
             <Loading />
           ) : searching ? (
-            <Search query={query} />
+            <Search query={query} forge={forge} />
           ) : view === 'decisions' ? (
-            <Decisions records={visible} all={records} />
+            <Decisions records={visible} all={records} forge={forge} />
           ) : view === 'overview' ? (
             <History
               records={records}
@@ -180,6 +183,7 @@ export function App(): ReactElement {
               visible={visible}
               episodes={episodes}
               topicId={topicId}
+              forge={forge}
               onClearFilters={() => {
                 setActive(new Set(LIT));
                 setTopicId(null);

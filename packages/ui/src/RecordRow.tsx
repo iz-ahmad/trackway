@@ -5,11 +5,14 @@ import {
   attributionOf,
   kindOf,
   titleOf,
+  type Forge,
   type MemoryRecord,
 } from './types.js';
 
 interface Props {
   record: MemoryRecord;
+  /** Where to read a commit, when the repository has a remote we recognise. */
+  forge?: Forge | undefined;
   /** A record outside the visible bands stays on the page and loses its colour. */
   muted?: boolean;
 }
@@ -27,7 +30,7 @@ export function tone(kind: string): CSSProperties {
  * because that is the thing the product exists to preserve and hiding it behind
  * a click would bury the point.
  */
-export function RecordRow({ record, muted = false }: Props): ReactElement {
+export function RecordRow({ record, forge, muted = false }: Props): ReactElement {
   const kind = kindOf(record);
   const who = attributionOf(record);
   // A decision that was later replaced keeps its place and loses its colour,
@@ -114,12 +117,32 @@ export function RecordRow({ record, muted = false }: Props): ReactElement {
         {record.commits.length > 0 ? (
           <div className="commits">
             <span className="lbl">Shipped in</span>
-            {record.commits.map((commit) => (
-              <span className="commit" key={commit.sha} title={`${commit.author} · ${commit.authoredAt.slice(0, 10)}`}>
-                <code>{commit.sha.slice(0, 8)}</code>
-                {commit.subject}
-              </span>
-            ))}
+            {record.commits.map((commit) => {
+              const label = (
+                <>
+                  <code>{commit.sha.slice(0, 8)}</code>
+                  {commit.subject}
+                </>
+              );
+              const title = `${commit.author} · ${commit.authoredAt.slice(0, 10)}`;
+
+              return forge ? (
+                <a
+                  className="commit"
+                  key={commit.sha}
+                  href={forge.commitUrl.replace('COMMIT', commit.sha)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={`${title} · opens on ${forge.host}`}
+                >
+                  {label}
+                </a>
+              ) : (
+                <span className="commit" key={commit.sha} title={title}>
+                  {label}
+                </span>
+              );
+            })}
           </div>
         ) : null}
       </div>

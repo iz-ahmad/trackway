@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { Caret } from '../icons.js';
 import { RecordRow } from '../RecordRow.js';
-import type { Episode, MemoryRecord } from '../types.js';
+import type { Episode, Forge, MemoryRecord } from '../types.js';
 
 interface Props {
   /** Everything in this session, for the counts the stream reports. */
@@ -10,6 +10,7 @@ interface Props {
   visible: MemoryRecord[];
   episodes: Episode[];
   topicId: string | null;
+  forge?: Forge | undefined;
   onClearFilters: () => void;
 }
 
@@ -25,6 +26,7 @@ export function Timeline({
   visible,
   episodes,
   topicId,
+  forge,
   onClearFilters,
 }: Props): ReactElement {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -72,7 +74,7 @@ export function Timeline({
               </span>
             </button>
 
-            {open ? group.records.map((record) => <RecordRow key={record.id} record={record} />) : null}
+            {open ? group.records.map((record) => <RecordRow key={record.id} record={record} forge={forge} />) : null}
           </section>
         );
       })}
