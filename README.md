@@ -202,7 +202,7 @@ trackway ingest chat.json
 
 ### Getting the accurate path
 
-Distillation is model-extracted and measured at precision 0.54, recall 0.91. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
+Distillation is model-extracted, with recall 0.91 against the sessions' own answer key. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
 
 Emit a tool entry named `AskUserQuestion`, `ask_question` or `request_user_input` whose input carries an option list, and the question, every option and each option's own reasoning are taken exactly as written, with no model involved:
 
@@ -245,19 +245,23 @@ Two paths, two very different answers. Conflating them would flatter the tool.
 
 **Harvested forks: deterministic.** Read verbatim from structured tool input. There is nothing to be accurate about; the data is the data. 186 forks across 485 sessions, all classified, none unresolved.
 
-**Distillation: measured.** Quality is checked against an answer key the sessions provide themselves. When an agent records an explicit option list and somebody answers it, that is ground truth with no hand labelling. Across 485 sessions there are 165 such decision points.
+**Distillation: measured, on the one thing that can be measured cheaply.** Some sessions record an explicit option list and an answer to it. That is ground truth with no hand labelling, and across 485 sessions there are 165 such decision points.
 
-Measured across 6 sessions of 1 to 26 decision points: **precision 0.54, recall 0.91, F1 0.68**.
+**Recall against that key: 0.91**, over 6 sessions of 1 to 26 decision points. Of the decisions a session is known to have made, the extractor finds nine in ten. That number means what it says.
 
-The previous figure was 0.57 / 0.68 / 0.62. Recall moved because the answer key was wrong, not because extraction improved. It counted every option list ever shown as a decision to be found, including 23 of 188 that were dismissed without an answer, so recall could never pass 0.88. Those are gone; what is left is a key of decisions that were actually made.
+**There is no trustworthy precision figure here yet, and the one this file used to carry was wrong.** It reported 0.54, arrived at by counting every extracted decision the key did not contain as an error. But the key can only contain decisions made through an explicit option list, and most decisions are not made that way. They are made in conversation. Every correct extraction of one counted against the score, so the number fell as the extractor got better at its actual job.
+
+Reading the worst-scoring session by hand settled it. All eight of its "false positives" were real engineering choices, five carrying recorded alternatives: cascade against null on delete, an observer against patching a controller, which approval flag to validate against. None was noise.
+
+`trackway eval` now judges each extracted decision against the transcript it came from, as sound, distorted or invented, which is the question the key cannot ask. On one session it rates 9 of 9 sound where the key rated 3 of 9; against four planted records, three inventions and one real question with its answer inverted, it rates 0 of 4. A judge that cannot say no would measure nothing, so it was checked both ways before being believed.
+
+A figure across every scored session is not published here yet. One session is an anecdote, and a run takes over an hour.
 
 Read the rest carefully:
 
-- **Precision fell slightly, and that is the honest direction.** Removing phantom expectations shrinks the key without shrinking what the extractor produces, so the surplus shows up as false positives. Roughly two in five extracted records are not in the key. Some are real decisions the key cannot contain, since it only covers those recorded as an explicit option list. Others are noise.
-- **A seventh session was scored and is missing.** Its distillation timed out at five minutes. It is excluded rather than counted as a zero, and the timeout is a real limit rather than a measurement artefact.
-- **Larger sessions are still the weak spot.** The largest scored had 26 decision points at recall 1.00, but the next largest at 17 scored 0.71. Sessions with far more than that remain unmeasured, because each costs around thirteen model calls and the run above took forty-five minutes.
-
-Scoring matches on the question. The key now also records which option was taken, which it previously discarded, so grading whether the extractor found the right *choice* rather than merely the right fork is possible and not yet done.
+- **A seventh session was scored and is missing.** Its distillation timed out at five minutes. It is excluded rather than counted as a zero. Chunks are now retried, which is the fix for that class of failure.
+- **Larger sessions are the weak spot.** The largest scored had 26 decision points at recall 1.00, but the next largest at 17 scored 0.71. Sessions far larger than that are unmeasured, because each costs around thirteen model calls.
+- **Nobody but the author has run this.** Every figure on this page comes from one machine and one person's sessions.
 
 Nothing gates a release on these numbers, by design. Suppressing a useful record to protect a score is the wrong trade.
 
