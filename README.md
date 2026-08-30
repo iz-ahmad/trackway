@@ -4,7 +4,7 @@
 
 Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
-> **Status:** v0.1.0. The full path runs end to end. Extraction quality is measured rather than guaranteed: see [How well does it work](#how-well-does-it-work).
+> **Status: v0.1.0.** The whole path works. Extraction is measured, not guaranteed, and about one extracted decision in five is currently invented: see [How well does it work](#how-well-does-it-work).
 
 ## Why use this
 
@@ -59,15 +59,15 @@ agent session files          you keep working normally
 
 Two paths produce records, and they are not equally reliable. Trackway is explicit about which one a record came from.
 
-**Harvested forks (deterministic).** When an agent presents you an explicit list of options, it stores the question, every option, and each option's rationale as structured tool input. Trackway reads that verbatim. No inference, no summarising, no model call. Measured across 485 real sessions, 186 forks were recorded this way, and every one is now classified:
+**Harvested forks (deterministic).** When an agent presents you an explicit list of options, it stores the question, every option, and each option's rationale as structured tool input. Trackway reads that verbatim: no inference, no summarising, no model call. Every fork ends one of three ways, and each is recorded as what it actually was:
 
-| Outcome | Share | Recorded as |
-| --- | --- | --- |
-| You picked one of the options | 78% | a decision, with the rest as rejected options |
-| You typed your own answer instead | 10% | a decision you authored, with **every** offered option rejected |
-| You dismissed the question | 12% | an open question, because nothing was decided |
+| You | Recorded as |
+| --- | --- |
+| picked one of the options | a decision, with the rest as rejected options |
+| typed your own answer instead | a decision you authored, with **every** offered option rejected |
+| dismissed the question | an open question, because nothing was decided |
 
-**Distillation (model-extracted).** Everything else goes through your own agent, running headless. This path is where the quality numbers below come from. It is a fallback, not the main event.
+**Distillation (model-extracted).** Everything else goes through your own agent, running headless. This is the fallback, and where the quality numbers below come from.
 
 ## Install
 
@@ -99,11 +99,7 @@ Work with your agent normally. There are no commands to run during a session.
 ```bash
 trackway sync                                 # distil sessions that have gone quiet
 trackway why src/limit.ts 42                  # what was decided that produced this line
-trackway search "why is cancellation async"   # search everything
 trackway rejected --about caching             # options you dropped, and why
-trackway decisions --actor human              # decisions you made, not the agent
-trackway show dec-20260824-a3f2               # one record in full
-trackway status                               # what is pending or failed
 trackway graph                                # open the local explorer
 ```
 
@@ -171,13 +167,11 @@ Credential redaction is best effort. A secret shaped like ordinary prose will ge
 
 OpenCode was meant to go through `opencode export --sanitize`, which returns already-redacted JSON. That path does not work non-interactively: `opencode session list` writes nothing when stdout is not a terminal, so sessions cannot be enumerated. Reading the database directly needs no binary and no terminal.
 
-**Cursor has no adapter yet.** Its chat history lives in an undocumented SQLite database and no Cursor installation was available to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason. Until then, `trackway ingest` takes it, and anything else.
-
-Adding a first-class adapter means writing a parser behind one interface. Nothing in the core changes.
+**Cursor has no adapter yet.** Its chat history is an undocumented SQLite database and there was no installation to verify a parser against. Guessing at a schema is how the Codex adapter shipped disabled for the wrong reason.
 
 ## Any other agent
 
-Every adapter above reads a store somebody else designed, so support waits on reverse-engineering a format and on owning a machine with that agent installed. `trackway ingest` needs neither. Pipe it a transcript and it becomes records like any session found on disk: same distillation, same fork harvesting, same commit linking.
+Each adapter above reads a store somebody else designed, so a new one waits on reverse-engineering a format *and* on owning a machine with that agent installed. `trackway ingest` needs neither, and it is how Cursor works today. Pipe it a transcript and it becomes records like any session found on disk: same distillation, same fork harvesting, same commit linking.
 
 ```bash
 cat chat.json | trackway ingest
@@ -198,13 +192,11 @@ trackway ingest chat.json
 }
 ```
 
-`agent` and `sessionId` are required; `sessionId` makes re-ingesting the same conversation a no-op rather than a duplicate. Every entry may carry its own `at`, and one without inherits the last seen. Credentials are redacted here exactly as they are on a session file.
+`agent` and `sessionId` are required, and reusing a `sessionId` makes re-ingesting the same conversation a no-op rather than a duplicate. An entry without an `at` inherits the last one seen. Credentials are redacted here exactly as on a session file.
 
-### Getting the accurate path
+### Reaching the deterministic path
 
-Distillation is model-extracted, with recall 0.91 against the sessions' own answer key. Fork harvesting is deterministic and reads what the session recorded verbatim. Any transcript can use the second one.
-
-Emit a tool entry named `AskUserQuestion`, `ask_question` or `request_user_input` whose input carries an option list, and the question, every option and each option's own reasoning are taken exactly as written, with no model involved:
+A transcript does not have to settle for model extraction. Name a tool entry `AskUserQuestion`, `ask_question` or `request_user_input`, give it an option list, and the question, every option and each option's reasoning are taken exactly as written, with no model involved:
 
 ```json
 {
@@ -223,7 +215,7 @@ Emit a tool entry named `AskUserQuestion`, `ask_question` or `request_user_input
 }
 ```
 
-That produces a decision carrying the option taken and both rejected ones with their reasons. If the answer names none of the options, it is recorded as an answer the developer wrote themselves with every option rejected. If the question was dismissed, it is recorded as an open question rather than a decision nobody made.
+That produces a decision carrying the option taken and both rejected ones with their reasons, on the same three-way rule as any other fork: an answer naming none of the options becomes a decision the developer authored, and a dismissed question stays a question.
 
 ## For agents
 
@@ -241,57 +233,50 @@ The server exposes no write tool. Records are created by distillation only.
 
 ## How well does it work
 
-Two paths, two very different answers. Conflating them would flatter the tool.
+Two paths, measured separately. Averaging them would flatter the tool.
 
-**Harvested forks: deterministic.** Read verbatim from structured tool input. There is nothing to be accurate about; the data is the data. 186 forks across 485 sessions, all classified, none unresolved.
+**Fork harvesting is deterministic.** It reads what the session recorded, verbatim. There is nothing to be accurate about.
 
-**Distillation: measured, on the one thing that can be measured cheaply.** Some sessions record an explicit option list and an answer to it. That is ground truth with no hand labelling, and across 485 sessions there are 165 such decision points.
+**Distillation is model-extracted and imperfect.** Measured over 6 sessions of 1 to 26 decision points:
 
-**Recall against that key: 0.91**, over 6 sessions of 1 to 26 decision points. Of the decisions a session is known to have made, the extractor finds nine in ten. That number means what it says.
+| | | |
+| --- | --- | --- |
+| **Recall** | **0.93** | of the decisions a session is known to have made, nine in ten are found |
+| **Precision** | **0.75** | of 73 judged decisions: 55 sound, 4 stating a real decision wrongly, **14 unsupported by the session at all** |
 
-**There is no trustworthy precision figure here yet, and the one this file used to carry was wrong.** It reported 0.54, arrived at by counting every extracted decision the key did not contain as an error. But the key can only contain decisions made through an explicit option list, and most decisions are not made that way. They are made in conversation. Every correct extraction of one counted against the score, so the number fell as the extractor got better at its actual job.
+Recall is scored against an answer key the sessions provide themselves: when a session records an option list and somebody answers it, that is ground truth with no hand labelling.
 
-Reading the worst-scoring session by hand settled it. All eight of its "false positives" were real engineering choices, five carrying recorded alternatives: cascade against null on delete, an observer against patching a controller, which approval flag to validate against. None was noise.
+Precision cannot be scored that way, because the key only holds decisions made through an option list and most are made in conversation. So `trackway eval` judges each extracted record against the transcript it came from, as sound, distorted or invented. A record the judge will not rule on is excluded rather than counted sound, so a judge failure can only understate the result. The judge was checked in both directions before being believed: against four planted records, three inventions and one real question with its answer inverted, it scores zero.
 
-`trackway eval` now judges each extracted decision against the transcript it came from, as sound, distorted or invented, which is the question the key cannot ask. On one session it rates 9 of 9 sound where the key rated 3 of 9; against four planted records, three inventions and one real question with its answer inverted, it rates 0 of 4. A judge that cannot say no would measure nothing, so it was checked both ways before being believed.
+**One extracted decision in five is invented.** That is the honest weak spot and the reason this is 0.x. Records are markdown in your repository and appear in your diffs, so they are reviewable, but do not trust them blindly yet.
 
-A figure across every scored session is not published here yet. One session is an anecdote, and a run takes over an hour.
+Two more limits worth knowing:
 
-Read the rest carefully:
+- **Large sessions are weaker.** A 26-point session scored recall 1.00; a 17-point one scored 0.71. Anything much larger is unmeasured, because each scored session costs around thirteen model calls and a run takes over an hour.
+- **Nobody but the author has run this.** Every figure here comes from one machine and one person's sessions.
 
-- **A seventh session was scored and is missing.** Its distillation timed out at five minutes. It is excluded rather than counted as a zero. Chunks are now retried, which is the fix for that class of failure.
-- **Larger sessions are the weak spot.** The largest scored had 26 decision points at recall 1.00, but the next largest at 17 scored 0.71. Sessions far larger than that are unmeasured, because each costs around thirteen model calls.
-- **Nobody but the author has run this.** Every figure on this page comes from one machine and one person's sessions.
-
-Nothing gates a release on these numbers, by design. Suppressing a useful record to protect a score is the wrong trade.
-
-Run it yourself:
+Nothing gates a release on these numbers. Suppressing a useful record to protect a score is the wrong trade.
 
 ```bash
-trackway eval
+trackway eval              # reproduce it
+trackway eval --key-only   # skip the judging, and the model spend
 ```
 
-## Release
-
-One package. The workspace is six, and publishing all of them would mean an npm organisation, six releases kept in version lockstep, and a user installing a CLI that drags in five scoped packages. `npm run build:package` bundles the workspace code into a single binary and stages it in `packages/cli/npm/`.
-
-Real dependencies stay external. `better-sqlite3` is native and cannot be bundled at all, and inlining the rest would trade a shared install for a bigger tarball. The build fails if two workspace packages declare different ranges for the same dependency, because the registry only sees one and the wrong one ships silently.
+## Releasing
 
 ```bash
-npm run build:package          # bundle, stage, and write the published manifest
-npm run verify:package         # install the tarball clean and exercise it
-npm run release                # all three in order, publishing last
+npm run release    # build, verify against a clean install, then publish
 ```
 
-Publish through `npm run release` rather than by hand. Publishing from `packages/cli/npm` directly runs no lifecycle script, so a stale bundle from an earlier build would ship without complaint.
-
-Every workspace package stays `private: true`. The only manifest without that flag is the one the build generates, so nothing publishes by accident.
+One package reaches the registry; the workspace of six is bundled into it. Publish through the script rather than by hand: publishing from `packages/cli/npm` directly runs no lifecycle hook, so a stale bundle would ship without complaint. Every workspace package stays `private: true`, and the only manifest without that flag is the one the build generates.
 
 ## Roadmap
 
-Version 1 covers ingestion, distillation, commit linking, search, the explorer, and MCP retrieval across three agents, plus a transcript format for everything else.
+Today: ingestion, distillation, commit linking, search, the explorer, and MCP retrieval across three agents, plus a transcript format for everything else.
 
-Deliberately not in version 1:
+Before 1.0, in order: fewer invented records, then recall measured on long sessions, then somebody other than the author running it.
+
+Deliberately out of scope for now:
 
 - Alerts when a rejected option becomes viable again, for example a dependency you lacked at the time and now have
 - A first-class Cursor adapter, until there is a machine to verify one against
@@ -305,7 +290,7 @@ Deliberately not in version 1:
 ```bash
 npm install
 npm run build      # compiles packages and builds the explorer
-npm test           # 472 tests
+npm test           # 505 tests
 npm run typecheck  # strict mode, sources and tests
 ```
 
@@ -313,7 +298,7 @@ The workspace is six packages. `core` holds the record model, the store, and sea
 
 ## Contributing
 
-Not yet accepting contributions. Recall needs to improve first.
+Not yet accepting contributions. Precision needs to improve first: one extracted decision in five is currently invented.
 
 ## License
 
