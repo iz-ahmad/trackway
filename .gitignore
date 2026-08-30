@@ -28,6 +28,9 @@ coverage/
 # Design skill working directory.
 .impeccable/
 
+# Local tooling. The release skill lives here and is deliberately not tracked.
+.claude/
+
 # Editor and OS
 .DS_Store
 .idea/
