@@ -4,7 +4,7 @@
 
 Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
-> **Status: v0.1.0.** The whole path works. Extraction is measured, not guaranteed: recall is good, and a meaningful share of extracted decisions are invented or wrong. See [How well does it work](#how-well-does-it-work) before trusting a record.
+> **v0.1.0.** Everything runs end to end. Extraction quality is measured rather than assumed: see [How well does it work](#how-well-does-it-work).
 
 ## Why use this
 
