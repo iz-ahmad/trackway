@@ -51,13 +51,33 @@ export interface PrecisionReport {
 /** Kept small so a judgement fits one call and stays about the record. */
 const EVIDENCE_MARGIN = 12;
 
+/** Records distilled from the same region share a window and one call. */
+function groupBySourceRegion(
+  decisions: ReadonlyArray<Extract<MemoryRecord, { type: 'decision' }>>,
+): Array<{ from: number; to: number; records: Array<Extract<MemoryRecord, { type: 'decision' }>> }> {
+  const groups = new Map<string, { from: number; to: number; records: typeof decisions[number][] }>();
+
+  for (const record of decisions) {
+    const { fromOffset, toOffset } = record.source;
+    const key = `${fromOffset}-${toOffset}`;
+    const existing = groups.get(key);
+    if (existing) existing.records.push(record);
+    else groups.set(key, { from: fromOffset, to: toOffset, records: [record] });
+  }
+
+  return [...groups.values()].sort((a, b) => a.from - b.from);
+}
+
 /**
  * Judges extracted decisions against the part of the session they came from.
  *
- * Each record carries the offsets it was distilled from, so the judge is shown
- * that region rather than the whole session. A judge given everything would be
- * asked to find the evidence as well as weigh it, and would fail at the first
- * job while appearing to do the second.
+ * One call per source region, not one for the session. Taking the widest span
+ * across every decision looked focused and was not: a session distilled in
+ * several chunks has decisions from end to end, so the window became the whole
+ * transcript. On a 2565-event session that prompt was unanswerable and every
+ * record came back unjudged, which the caller correctly excluded, so large
+ * sessions quietly contributed nothing to the score at all. They are the ones
+ * that extract worst, so their absence flattered the result.
  */
 export async function judgePrecision(
   runner: DistillRunner,
@@ -72,42 +92,44 @@ export async function judgePrecision(
     return { judged: [], sound: 0, distorted: 0, invented: 0, precision: 0 };
   }
 
-  const from = Math.min(...decisions.map((record) => record.source.fromOffset));
-  const to = Math.max(...decisions.map((record) => record.source.toOffset));
-  const evidence = events.filter(
-    (event) =>
-      event.source.offset >= from - EVIDENCE_MARGIN && event.source.offset <= to + EVIDENCE_MARGIN,
-  );
-
-  let parsed: z.infer<typeof Judgement> | null = null;
-  try {
-    const raw = await runner.run(buildPrecisionPrompt(decisions, evidence));
-    const result = Judgement.safeParse(extractJsonObject(raw));
-    if (result.success) parsed = result.data;
-  } catch {
-    // A judge that cannot answer scores nothing rather than scoring badly.
-  }
-
-  const byIndex = new Map(
-    (parsed?.verdicts ?? [])
-      .filter((entry) => entry.index < decisions.length)
-      .map((entry) => [entry.index, entry]),
-  );
-
   const judged: JudgedRecord[] = [];
-  decisions.forEach((record, index) => {
-    const entry = byIndex.get(index);
-    // An unjudged record is left out rather than assumed sound. A judge failure
-    // must never be able to inflate the result.
-    if (!entry) return;
-    judged.push({
-      id: record.id,
-      question: record.question,
-      choice: record.choice,
-      verdict: entry.verdict,
-      why: entry.why,
+
+  for (const group of groupBySourceRegion(decisions)) {
+    const evidence = events.filter(
+      (event) =>
+        event.source.offset >= group.from - EVIDENCE_MARGIN &&
+        event.source.offset <= group.to + EVIDENCE_MARGIN,
+    );
+
+    let parsed: z.infer<typeof Judgement> | null = null;
+    try {
+      const raw = await runner.run(buildPrecisionPrompt(group.records, evidence));
+      const result = Judgement.safeParse(extractJsonObject(raw));
+      if (result.success) parsed = result.data;
+    } catch {
+      // A region that cannot be judged scores nothing rather than scoring badly.
+    }
+
+    const byIndex = new Map(
+      (parsed?.verdicts ?? [])
+        .filter((entry) => entry.index < group.records.length)
+        .map((entry) => [entry.index, entry]),
+    );
+
+    group.records.forEach((record, index) => {
+      const entry = byIndex.get(index);
+      // An unjudged record is left out rather than assumed sound. A judge
+      // failure must never be able to inflate the result.
+      if (!entry) return;
+      judged.push({
+        id: record.id,
+        question: record.question,
+        choice: record.choice,
+        verdict: entry.verdict,
+        why: entry.why,
+      });
     });
-  });
+  }
 
   const count = (verdict: PrecisionVerdict): number =>
     judged.filter((entry) => entry.verdict === verdict).length;

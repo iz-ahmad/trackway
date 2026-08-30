@@ -154,3 +154,73 @@ describe('the precision prompt', () => {
     expect(prompt).toContain('turn 0');
   });
 });
+
+describe('judging a session distilled in several regions', () => {
+  function decisionFrom(from: number, to: number, question: string): MemoryRecord {
+    const record = decision(question) as Extract<MemoryRecord, { type: 'decision' }>;
+    return { ...record, id: `dec-${from}-${to}`, source: { ...record.source, fromOffset: from, toOffset: to } };
+  }
+
+  const wide = Array.from({ length: 40 }, (_, i) => event(i));
+
+  it('judges each region separately rather than in one call', async () => {
+    // The widest span across every decision is not a window: a session
+    // distilled in chunks has decisions from end to end, so it became the whole
+    // transcript, the prompt was unanswerable, and every record went unjudged.
+    let calls = 0;
+    const runner: DistillRunner = {
+      id: 'stub',
+      isAvailable: async () => ({ available: true }),
+      run: async () => {
+        calls += 1;
+        return JSON.stringify({ verdicts: [{ index: 0, verdict: 'sound', why: '' }] });
+      },
+    };
+
+    await judgePrecision(
+      runner,
+      [decisionFrom(0, 4, 'Which cache?'), decisionFrom(30, 34, 'Which queue?')],
+      wide,
+    );
+
+    expect(calls).toBe(2);
+  });
+
+  it('shows each region only its own part of the transcript', async () => {
+    const prompts: string[] = [];
+    const runner: DistillRunner = {
+      id: 'stub',
+      isAvailable: async () => ({ available: true }),
+      run: async (prompt) => {
+        prompts.push(prompt);
+        return JSON.stringify({ verdicts: [{ index: 0, verdict: 'sound', why: '' }] });
+      },
+    };
+
+    await judgePrecision(runner, [decisionFrom(30, 34, 'Which queue?')], wide);
+
+    expect(prompts[0]).toContain('turn 30');
+    expect(prompts[0]).not.toContain('turn 0');
+  });
+
+  it('keeps the regions it could judge when one of them fails', async () => {
+    let calls = 0;
+    const runner: DistillRunner = {
+      id: 'stub',
+      isAvailable: async () => ({ available: true }),
+      run: async () => {
+        calls += 1;
+        if (calls === 1) throw new RunnerError('stub', 'timeout', 'timed out');
+        return JSON.stringify({ verdicts: [{ index: 0, verdict: 'sound', why: '' }] });
+      },
+    };
+
+    const report = await judgePrecision(
+      runner,
+      [decisionFrom(0, 4, 'Which cache?'), decisionFrom(30, 34, 'Which queue?')],
+      wide,
+    );
+
+    expect(report.judged).toHaveLength(1);
+  });
+});
