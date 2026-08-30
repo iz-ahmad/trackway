@@ -4,6 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Trackway</title>
+    <script>
+      // Applies a stored theme before first paint. Without this a reader who
+      // pinned dusk gets a white flash on every reload, because React cannot
+      // run early enough to prevent it.
+      try {
+        var t = localStorage.getItem('trackway-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        /* Storage blocked. The default ground is correct anyway. */
+      }
+    </script>
   </head>
   <body>
     <!--

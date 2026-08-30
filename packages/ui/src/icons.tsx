@@ -61,3 +61,32 @@ export function Cross({ className, size = 14 }: Props) {
     </svg>
   );
 }
+
+/** The machine decides. */
+export function Monitor({ size = 15 }: Props) {
+  return (
+    <svg {...base(size)}>
+      <rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1.25" />
+      <path d="M5.75 14.25h4.5" />
+    </svg>
+  );
+}
+
+/** Pinned to the day ground. */
+export function Sun({ size = 15 }: Props) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="8" cy="8" r="3.15" />
+      <path d="M8 1.5v1.4M8 13.1v1.4M14.5 8h-1.4M2.9 8H1.5M12.6 3.4l-1 1M4.4 11.6l-1 1M12.6 12.6l-1-1M4.4 4.4l-1-1" />
+    </svg>
+  );
+}
+
+/** Pinned to the dusk ground. */
+export function Moon({ size = 15 }: Props) {
+  return (
+    <svg {...base(size)}>
+      <path d="M13.4 9.6A5.9 5.9 0 016.4 2.6a5.9 5.9 0 107 7z" />
+    </svg>
+  );
+}

@@ -8,5 +8,8 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["packages/*/test/**/*.ts", "test/**/*.ts", "packages/*/src/**/*.ts"]
+  "include": ["packages/*/test/**/*.ts", "test/**/*.ts", "packages/*/src/**/*.ts"],
+
+  "//": "The explorer is a browser package. It is typechecked by packages/ui/tsconfig.json, which carries the DOM lib; checking it again here, against node types, only reports the DOM as missing.",
+  "exclude": ["packages/ui"]
 }

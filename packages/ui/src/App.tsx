@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ComponentType, type ReactElement } from 'react';
 import { api } from './api.js';
-import { Search as SearchIcon } from './icons.js';
+import { Monitor, Moon, Search as SearchIcon, Sun } from './icons.js';
 import { Rail } from './Rail.js';
+import { applyTheme, nextTheme, readTheme, type Theme } from './theme.js';
 import { Decisions } from './views/Decisions.js';
 import { History } from './views/History.js';
 import { Search } from './views/Search.js';
@@ -18,6 +19,52 @@ import {
 type View = 'story' | 'decisions' | 'overview';
 
 const LIT: Significance[] = ['business', 'technical', 'direction'];
+
+/** What each theme is called, and what the icon for it is. */
+const THEME_LABEL: Record<Theme, string> = {
+  system: 'Matching your system',
+  light: 'Light',
+  dark: 'Dark',
+};
+
+const THEME_ICON: Record<Theme, ComponentType<{ size?: number }>> = {
+  system: Monitor,
+  light: Sun,
+  dark: Moon,
+};
+
+/**
+ * Cycles the ground the interface is drawn on.
+ *
+ * One button rather than three, because the header is meant to stay quiet and
+ * this is not what anyone came here to do. The label carries both halves of
+ * the state a cycling control hides: what it is now, and what pressing it
+ * does next.
+ */
+function ThemeToggle(): ReactElement {
+  const [theme, setTheme] = useState<Theme>(() => readTheme());
+
+  // Runs once so a stored choice survives a reload. The inline script in the
+  // document has already applied it before paint; this only syncs React.
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const Icon = THEME_ICON[theme];
+  const next = nextTheme(theme);
+
+  return (
+    <button
+      type="button"
+      className="theme"
+      title={`Theme: ${THEME_LABEL[theme].toLowerCase()}. Switch to ${THEME_LABEL[next].toLowerCase()}.`}
+      aria-label={`Theme: ${THEME_LABEL[theme].toLowerCase()}. Switch to ${THEME_LABEL[next].toLowerCase()}.`}
+      onClick={() => setTheme(next)}
+    >
+      <Icon />
+    </button>
+  );
+}
 
 const TABS = [
   ['story', 'Story'],
@@ -121,7 +168,8 @@ export function App(): ReactElement {
             </div>
           </div>
 
-          <nav className="tabs" aria-label="Views">
+          <div className="tabrow">
+            <nav className="tabs" aria-label="Views">
             {TABS.map(([id, label]) => (
               <button
                 key={id}
@@ -134,8 +182,11 @@ export function App(): ReactElement {
               >
                 {label}
               </button>
-            ))}
-          </nav>
+              ))}
+            </nav>
+
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

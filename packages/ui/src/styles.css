@@ -287,9 +287,46 @@ code {
   appearance: none;
 }
 
+.tabrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26px;
+}
+
 .tabs {
   display: flex;
   gap: 26px;
+}
+
+/*
+  The ground control.
+
+  Quiet enough to ignore: it carries no border until it is reached for, which
+  keeps the header a row of words rather than a row of controls.
+*/
+.theme {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-block-end: 2px;
+  border-radius: 50%;
+  color: var(--ink-3);
+  transition:
+    color 0.2s var(--ease),
+    background-color 0.2s var(--ease);
+}
+
+.theme:hover {
+  color: var(--ink);
+  background: var(--sunk);
+}
+
+.theme:focus-visible {
+  outline: none;
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--focus);
 }
 
 .tabs button {
