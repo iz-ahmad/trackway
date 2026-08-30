@@ -249,8 +249,17 @@ code {
   transition: border-color 0.2s var(--ease);
 }
 
+/*
+  Focus hugs the field rather than ringing it.
+  
+  An outline at an offset drew a second box around a control that already has a
+  border, and on a text input it appears on click as well as on tab, because
+  :focus-visible always matches an input: you are about to type. The border
+  itself carries the state, thickened with a shadow so nothing reflows.
+*/
 .omni:focus-within {
-  border-color: var(--ink-2);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
 }
 
 .omni input {
@@ -268,14 +277,6 @@ code {
 
 .omni input::placeholder {
   color: var(--ink-3);
-}
-
-/* The field itself carries the ring, since the input fills a bordered box and
-   an outline on the input would sit inside that border. */
-.omni:focus-within {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-  border-radius: 2px;
 }
 
 .omni input:focus {
@@ -466,18 +467,17 @@ code {
   color: var(--ink-3);
 }
 
-/* Pointer focus keeps the quieter treatment: the ring is for people who cannot
-   see where they clicked. This rule comes first on purpose, because it has the
-   same specificity as the one below and would otherwise cancel it. */
+/* An underlined field thickens its own underline, for the same reason the
+   search box thickens its border: a full box drawn around a control that has
+   only a bottom rule reads as a different control. */
 .tp-find:focus {
   outline: none;
-  border-bottom-color: var(--ink-2);
+  border-bottom-color: var(--focus);
+  box-shadow: 0 1px 0 0 var(--focus);
 }
 
 .tp-find:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-  border-radius: 2px;
+  outline: none;
 }
 
 .tp-find::-webkit-search-cancel-button {
