@@ -4,7 +4,7 @@
 
 Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
 
-> **Status: v0.1.0.** The whole path works. Extraction is measured, not guaranteed, and about one extracted decision in five is currently invented: see [How well does it work](#how-well-does-it-work).
+> **Status: v0.1.0.** The whole path works. Extraction is measured, not guaranteed: recall is good, and a meaningful share of extracted decisions are invented or wrong. See [How well does it work](#how-well-does-it-work) before trusting a record.
 
 ## Why use this
 
@@ -237,18 +237,15 @@ Two paths, measured separately. Averaging them would flatter the tool.
 
 **Fork harvesting is deterministic.** It reads what the session recorded, verbatim. There is nothing to be accurate about.
 
-**Distillation is model-extracted and imperfect.** Measured over 6 sessions of 1 to 26 decision points:
+**Distillation is model-extracted and imperfect.**
 
-| | | |
-| --- | --- | --- |
-| **Recall** | **0.93** | of the decisions a session is known to have made, nine in ten are found |
-| **Precision** | **0.75** | of 73 judged decisions: 55 sound, 4 stating a real decision wrongly, **14 unsupported by the session at all** |
+**Recall is 0.93**, over 6 sessions of 1 to 26 decision points. Of the decisions a session is known to have made, nine in ten are found. It is scored against an answer key the sessions provide themselves: when a session records an option list and somebody answers it, that is ground truth with no hand labelling.
 
-Recall is scored against an answer key the sessions provide themselves: when a session records an option list and somebody answers it, that is ground truth with no hand labelling.
+**Precision is roughly three in four, and that figure is not yet stable enough to pin down.** The key cannot measure it, because it only holds decisions made through an option list and most are made in conversation. So `trackway eval` judges each extracted record against the transcript it came from, as sound, distorted or invented. The judge was checked in both directions before being trusted: against four planted records, three inventions and one real question with its answer inverted, it scores zero.
 
-Precision cannot be scored that way, because the key only holds decisions made through an option list and most are made in conversation. So `trackway eval` judges each extracted record against the transcript it came from, as sound, distorted or invented. A record the judge will not rule on is excluded rather than counted sound, so a judge failure can only understate the result. The judge was checked in both directions before being believed: against four planted records, three inventions and one real question with its answer inverted, it scores zero.
+Two measurements of precision have been published here and both were wrong, for different reasons, so this one is described rather than quoted until a run repeats itself. What is not in doubt: **some extracted decisions are invented**, meaning the session does not support them at all. Roughly one in four extracted decisions is either invented or states a real decision wrongly.
 
-**One extracted decision in five is invented.** That is the honest weak spot and the reason this is 0.x. Records are markdown in your repository and appear in your diffs, so they are reviewable, but do not trust them blindly yet.
+That is the honest weak spot and the reason this is 0.x. Records are markdown in your repository and appear in your diffs, so they are reviewable, but do not trust them blindly yet.
 
 Two more limits worth knowing:
 
@@ -298,7 +295,7 @@ The workspace is six packages. `core` holds the record model, the store, and sea
 
 ## Contributing
 
-Not yet accepting contributions. Precision needs to improve first: one extracted decision in five is currently invented.
+Not yet accepting contributions. Precision needs to improve first, and needs a measurement that repeats itself.
 
 ## License
 
