@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { InvalidTranscriptError, defaultRegistry } from '@trackway/adapters';
 import {
   TrackwayConfig,
@@ -20,10 +21,11 @@ import {
   type MemoryRecord,
   type RecordType,
 } from '@trackway/core';
-import { loadState } from '@trackway/distill';
+import { loadState, type SweepProgress } from '@trackway/distill';
 import { alternativeLine, detail, oneLine, shortDate, truncate } from '../format.js';
 import { hookCommand, hookTargets, installHook, isHookInstalled } from '../hook.js';
 import { ingestTranscript, sync } from '../pipeline.js';
+import { createProgress, formatDuration, type ProgressOptions } from '../progress.js';
 import {
   ensureIgnoreRules,
   loadWorkspace,
@@ -35,12 +37,141 @@ import {
 export interface Io {
   out: (line: string) => void;
   err: (line: string) => void;
+  /**
+   * A line that is replaced rather than added to.
+   *
+   * Optional, because not every caller has somewhere to put one. Passing the
+   * empty string clears it.
+   */
+  status?: (line: string) => void;
+  /** True when `status` can redraw a line in place, so progress can animate. */
+  interactive?: boolean;
 }
 
 export const consoleIo: Io = {
   out: (line) => process.stdout.write(`${line}\n`),
   err: (line) => process.stderr.write(`${line}\n`),
+  interactive: process.stderr.isTTY === true,
+  status: (line) => {
+    // On a terminal this is one line rewritten in place, so a sync that runs
+    // for twenty minutes leaves twenty minutes of progress behind it rather
+    // than twenty minutes of scrollback. Anywhere else it is a plain line,
+    // because a carriage return in a log file is noise.
+    if (!process.stderr.isTTY) {
+      if (line) process.stderr.write(`${line}\n`);
+      return;
+    }
+
+    // A terminal that does not report its width reports zero, not nothing, so
+    // `?? 80` left a width of zero and trimmed the last character off every
+    // line. Unknown width means print it whole and let the terminal wrap.
+    const width = process.stderr.columns;
+    const fits = !width || width < 2 || line.length < width;
+    process.stderr.write(`\r\u001b[2K${fits ? line : line.slice(0, width - 1)}`);
+  },
 };
+
+function describeOutcome(event: SweepProgress & { phase: 'done' }): string {
+  switch (event.outcome) {
+    case 'distilled':
+      return `${event.records} record(s)`;
+    case 'ingest-only':
+      return 'read, but this agent cannot distil';
+    case 'partial':
+      return `${event.records} record(s), part of it could not be read`;
+    case 'failed':
+      return `failed: ${truncate(event.reason ?? 'unknown', 80)}`;
+  }
+}
+
+export interface SweepReporter {
+  report: (event: SweepProgress) => void;
+  /** Ends the animation and leaves the line clean. Safe to call twice. */
+  finish: () => void;
+}
+
+/**
+ * Turns sweep progress into something to watch while it runs.
+ *
+ * A sync spends most of its time inside one model call that can take minutes,
+ * so a line that only changes when a session finishes looks exactly like a
+ * hang. It gets killed, and the work is lost. A moving spinner says the process
+ * is alive; the bar and the counts say how much is behind it and how much is
+ * left.
+ */
+export function sweepReporter(io: Io, options: ProgressOptions = {}): SweepReporter {
+  const progress = createProgress(io, options);
+
+  let total = 0;
+  let completed = 0;
+
+  const show = (
+    event: Exclude<SweepProgress, { phase: 'planned' }>,
+    activity: string,
+  ): void => {
+    total = event.total;
+    progress.set({
+      completed,
+      total: event.total,
+      index: event.index,
+      sessionId: event.sessionId,
+      activity,
+    });
+  };
+
+  return {
+    finish: () => progress.stop(),
+
+    report: (event) => {
+      if (event.phase === 'planned') {
+        if (event.eligible === 0) {
+          io.out(`Nothing to sync. ${event.discovered} session(s) already up to date.`);
+          return;
+        }
+
+        const deferred = event.deferred > 0 ? `, ${event.deferred} left for the next run` : '';
+        io.out(
+          `${event.eligible} session(s) to sync${deferred}. Each one is several model calls, so this takes minutes rather than seconds.`,
+        );
+        return;
+      }
+
+      switch (event.phase) {
+        case 'reading':
+          show(event, 'reading');
+          return;
+
+        case 'distilling':
+          show(event, `${event.events} events, distilling`);
+          return;
+
+        case 'note':
+          show(event, event.message);
+          return;
+
+        case 'done': {
+          completed += 1;
+
+          // A session that failed or came back incomplete is worth keeping on
+          // screen, so it goes to the error stream rather than the line the next
+          // session overwrites. One or the other, never both: off a terminal the
+          // status line is a printed line too, and doing both said it twice.
+          if (event.outcome === 'failed' || event.outcome === 'partial') {
+            progress.clear();
+            io.err(
+              `[${event.index}/${event.total}] ${event.sessionId.slice(0, 8)}  ${describeOutcome(event)}`,
+            );
+          } else {
+            show(event, describeOutcome(event));
+          }
+
+          if (event.index === total) progress.stop();
+          return;
+        }
+      }
+    },
+  };
+}
 
 const NOT_A_REPO = 'Not inside a git repository. Trackway stores records per repository.';
 
@@ -68,10 +199,20 @@ async function requireWorkspace(io: Io): Promise<Workspace | null> {
  */
 async function selfHeal(workspace: Workspace, io: Io, quiet: boolean): Promise<void> {
   try {
-    const result = await sync(workspace, { maxSessions: 5 });
+    // Progress matters more here than in `sync`, not less. Nobody runs a search
+    // expecting to wait, so the catch-up has to say that it is what is holding
+    // the answer up.
+    const reporter = quiet ? null : sweepReporter(io);
+
+    const result = await sync(workspace, {
+      maxSessions: 5,
+      ...(reporter ? { onProgress: reporter.report } : {}),
+    }).finally(() => reporter?.finish());
+
     if (!quiet && result.written > 0) {
       io.out(`(distilled ${result.written} new record${result.written === 1 ? '' : 's'})\n`);
     }
+    if (!quiet) for (const error of result.errors) io.err(`(sync failed: ${truncate(error, 100)})`);
   } catch (error) {
     if (!quiet) io.err(`(sync skipped: ${String(error)})`);
   }
@@ -133,17 +274,23 @@ export async function syncCommand(
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
 
-  const result = await sync(
-    workspace,
-    options.max === undefined ? {} : { maxSessions: options.max },
-  );
+  const startedAt = Date.now();
+
+  const reporter = options.quiet ? null : sweepReporter(io);
+
+  // Stopped whatever happens, so an interrupted or failed sync cannot leave a
+  // spinner ticking over the summary.
+  const result = await sync(workspace, {
+    ...(options.max === undefined ? {} : { maxSessions: options.max }),
+    ...(reporter ? { onProgress: reporter.report } : {}),
+  }).finally(() => reporter?.finish());
 
   if (options.quiet) return 0;
 
   const distilled = result.sweep.swept.filter((s) => !s.undistilled).length;
   const undistilled = result.sweep.swept.filter((s) => s.undistilled).length;
 
-  io.out(`Swept ${result.sweep.swept.length} session(s).`);
+  io.out(`Swept ${result.sweep.swept.length} session(s) in ${formatDuration(Date.now() - startedAt)}.`);
   io.out(`  distilled:   ${distilled}`);
   if (undistilled > 0) io.out(`  ingest only: ${undistilled} (agent cannot distil)`);
   io.out(`  records:     ${result.written} new, ${result.skippedExisting} already present`);
@@ -160,10 +307,25 @@ export async function syncCommand(
     io.out(
       `  incomplete:  ${partial.length} session(s) had a region that could not be read; run again to retry it`,
     );
+    // The count alone says something went wrong and nothing about what, which
+    // is the state this whole change exists to get out of.
+    for (const session of partial.slice(0, 3)) {
+      const reason = session.partialReasons?.[0];
+      if (reason) io.err(`    ${session.sessionId.slice(0, 12)}: ${truncate(reason, 90)}`);
+    }
   }
 
   for (const failure of result.sweep.failures) {
     io.err(`  failed: ${failure.sessionId.slice(0, 12)}: ${truncate(failure.reason, 90)}`);
+  }
+
+  // The sync itself fell over rather than one session in it. Without this the
+  // empty result read as a clean sweep with nothing to do.
+  for (const error of result.errors) {
+    io.err(`  sync failed: ${truncate(error, 120)}`);
+  }
+  if (result.errors.length > 0) {
+    io.err(`  more detail in ${join(workspace.cacheDir, 'failures.log')}`);
   }
 
   return 0;

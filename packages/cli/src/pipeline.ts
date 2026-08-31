@@ -15,6 +15,7 @@ import {
   createDistiller,
   purgeCache,
   runSweep,
+  type SweepProgress,
   type SweepResult,
 } from '@trackway/distill';
 import { isolate } from '@trackway/core';
@@ -26,11 +27,31 @@ export interface SyncResult {
   written: number;
   skippedExisting: number;
   purgedCacheFiles: number;
+  /**
+   * What went wrong at a level that stopped the sync, rather than one session.
+   *
+   * Isolation keeps a failure from taking the caller down, but returning the
+   * empty result on its own reported the same thing as a clean sweep with
+   * nothing to do. A sync that fell over said "Swept 0 session(s)." and left
+   * the person running it with nothing to go on.
+   */
+  errors: string[];
 }
 
 export interface SyncOptions {
   maxSessions?: number;
   now?: Date;
+  onProgress?: (event: SweepProgress) => void;
+}
+
+function empty(): SyncResult {
+  return {
+    sweep: { swept: [], skipped: [], failures: [], deferred: 0 },
+    written: 0,
+    skippedExisting: 0,
+    purgedCacheFiles: 0,
+    errors: [],
+  };
 }
 
 /**
@@ -40,24 +61,28 @@ export interface SyncOptions {
  * command as a self-heal, and from an agent hook, and in all three cases a
  * failure must be reported rather than raised. Interrupting the developer's
  * coding session is the one outcome this system must never cause.
+ *
+ * Not raising is not the same as not saying. Whatever was swallowed comes back
+ * in `errors` for the caller to print.
  */
-const EMPTY: SyncResult = {
-  sweep: { swept: [], skipped: [], failures: [], deferred: 0 },
-  written: 0,
-  skippedExisting: 0,
-  purgedCacheFiles: 0,
-};
-
 export async function sync(workspace: Workspace, options: SyncOptions = {}): Promise<SyncResult> {
-  return isolate(() => runSync(workspace, options), EMPTY, {
+  const errors: string[] = [];
+
+  const result = await isolate(() => runSync(workspace, options), empty(), {
     operation: 'sync',
     logPath: join(workspace.cacheDir, 'failures.log'),
+    onFailure: (failure) => errors.push(failure.message),
   });
+
+  return { ...result, errors: [...result.errors, ...errors] };
 }
 
 async function runSync(workspace: Workspace, options: SyncOptions): Promise<SyncResult> {
   const registry = defaultRegistry();
   const distill = createDistiller({ runner: new ClaudeDistillRunner() });
+
+  let written = 0;
+  let skipped = 0;
 
   const sweep = await runSweep(registry, distill, {
     cacheDir: workspace.cacheDir,
@@ -65,24 +90,28 @@ async function runSync(workspace: Workspace, options: SyncOptions): Promise<Sync
     repoRoot: workspace.repoRoot,
     ...(options.maxSessions === undefined ? {} : { maxSessions: options.maxSessions }),
     ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+
+    // One session at a time, as it finishes. Holding everything until the last
+    // session meant a sweep that was interrupted after twenty minutes kept
+    // nothing, and the next run started from the beginning. The sweep treats a
+    // throw here as that session failing, so its watermark stays put.
+    onSession: async (session) => {
+      if (session.records.length === 0) return;
+
+      // Linking is derived from history that already exists, so it runs on
+      // every record rather than only on ones written while a hook was
+      // installed. It is also allowed to fail: a repository with no commits, or
+      // none at all, still has a usable record. Attribution follows the link,
+      // because a commit author is what the repository itself says about who
+      // was working.
+      const records = await linkAndAttribute(workspace, session.records);
+      const result = await persist(workspace, records);
+
+      written += result.written;
+      skipped += result.skipped;
+    },
   });
-
-  const distilled = sweep.swept.flatMap((session) => session.records);
-
-  // Linking is derived from history that already exists, so it runs on every
-  // record rather than only on ones written while a hook was installed. It is
-  // also allowed to fail: a repository with no commits, or none at all, still
-  // has a usable record. Attribution follows the link, because a commit author
-  // is what the repository itself says about who was working.
-  const records = await linkAndAttribute(workspace, distilled);
-
-  // Persisting is isolated separately from sweeping. A locked index or an
-  // unwritable store must not discard the sweep that already succeeded.
-  const { written, skipped } = await isolate(
-    () => persist(workspace, records),
-    { written: 0, skipped: 0 },
-    { operation: 'persist', logPath: join(workspace.cacheDir, 'failures.log') },
-  );
 
   const purge = await purgeCache(
     workspace.cacheDir,
@@ -90,7 +119,7 @@ async function runSync(workspace: Workspace, options: SyncOptions): Promise<Sync
     options.now ?? new Date(),
   ).catch(() => ({ purged: 0, kept: 0 }));
 
-  return { sweep, written, skippedExisting: skipped, purgedCacheFiles: purge.purged };
+  return { sweep, written, skippedExisting: skipped, purgedCacheFiles: purge.purged, errors: [] };
 }
 
 /**

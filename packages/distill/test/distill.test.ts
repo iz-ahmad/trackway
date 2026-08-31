@@ -10,6 +10,8 @@ import {
   collapseNearDuplicates,
   createDistiller,
   extractJsonObject,
+  partialFailures,
+  partialReasons,
   renderTranscript,
   toRecords,
   type DistillRunner,
@@ -1037,5 +1039,118 @@ describe('a chunk that fails for a passing reason', () => {
     }).call(null, { descriptor, events, fromOffset: 0 });
 
     expect(messages.join('\n')).toContain('retrying');
+  });
+});
+
+
+describe('explaining a long distillation while it runs', () => {
+  const eventAt = (offset: number, text: string): MemoryEvent => ({
+    id: `claude-code:ses-1:${offset}`,
+    sessionId: 'ses-1',
+    timestamp: '2026-08-25T09:00:00Z',
+    type: 'user_prompt',
+    actor: { type: 'human', id: 'human:local' },
+    payload: { text },
+    source: { adapter: 'claude-code', sessionFile: '/tmp/ses-1.jsonl', offset },
+  });
+
+  const eventsN = (n: number): MemoryEvent[] =>
+    Array.from({ length: n }, (_, i) => eventAt(i, `turn ${i}`));
+
+  const empty = JSON.stringify({
+    questions: [],
+    discoveries: [],
+    decisions: [],
+    actions: [],
+    outcomes: [],
+  });
+
+  const silent: DistillRunner = {
+    id: 'stub',
+    isAvailable: async () => ({ available: true }),
+    run: async () => empty,
+  };
+
+  // Each chunk is a model call taking most of a minute. Said before the call
+  // rather than after it, because the wait is the part that needs explaining.
+  it('names the chunk it is about to send', async () => {
+    const messages: string[] = [];
+
+    await createDistiller({ runner: silent, chunkSize: 10 })({
+      descriptor,
+      events: eventsN(30),
+      fromOffset: -1,
+      onProgress: (message) => messages.push(message),
+    });
+
+    expect(messages).toContain('chunk 1 of 3');
+    expect(messages).toContain('chunk 3 of 3');
+  });
+
+  it('prefers the channel the caller passed for this session', async () => {
+    const perDistiller: string[] = [];
+    const perCall: string[] = [];
+
+    await createDistiller({
+      runner: silent,
+      chunkSize: 10,
+      onProgress: (message) => perDistiller.push(message),
+    })({
+      descriptor,
+      events: eventsN(20),
+      fromOffset: -1,
+      onProgress: (message) => perCall.push(message),
+    });
+
+    expect(perCall).toContain('chunk 1 of 2');
+    expect(perDistiller).toEqual([]);
+  });
+
+  it('keeps why a chunk was given up on, not only that one was', async () => {
+    let calls = 0;
+    const failsSecondChunk: DistillRunner = {
+      id: 'stub',
+      isAvailable: async () => ({ available: true }),
+      run: async () => {
+        calls += 1;
+        if (calls > 1) throw new RunnerError('claude-code', 'timeout', 'timed out after 300000ms');
+        return JSON.stringify({
+          questions: [],
+          discoveries: [{ significance: 'technical', text: 'The first chunk came back fine.' }],
+          decisions: [],
+          actions: [],
+          outcomes: [],
+        });
+      },
+    };
+
+    const records = await createDistiller({
+      runner: failsSecondChunk,
+      chunkSize: 10,
+      maxAttempts: 1,
+    })({ descriptor, events: eventsN(20), fromOffset: -1 });
+
+    expect(partialFailures(records)).toBe(1);
+    expect(partialReasons(records)).toEqual(['claude-code: timed out after 300000ms']);
+  });
+
+  it('says a chunk was given up on rather than leaving a gap in the count', async () => {
+    const messages: string[] = [];
+    const alwaysFails: DistillRunner = {
+      id: 'stub',
+      isAvailable: async () => ({ available: true }),
+      run: async () => {
+        throw new RunnerError('claude-code', 'timeout', 'timed out');
+      },
+    };
+
+    await createDistiller({ runner: alwaysFails, chunkSize: 10, maxAttempts: 1 })({
+      descriptor,
+      events: eventsN(10),
+      fromOffset: -1,
+      onProgress: (message) => messages.push(message),
+    }).catch(() => undefined);
+
+    expect(messages.join('\n')).toContain('gave up: claude-code: timed out');
   });
 });

@@ -52,6 +52,11 @@ function isWorthRetrying(error: unknown): boolean {
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** One line a person can act on, rather than a stack trace or `[object Object]`. */
+function describeFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Turns a recorded fork into a record.
  *
@@ -176,8 +181,12 @@ function dedupe(records: readonly MemoryRecord[]): MemoryRecord[] {
 export function createDistiller(options: DistillerOptions): Distiller {
   const now = options.now ?? (() => new Date());
 
-  return async ({ descriptor, events, fromOffset }): Promise<MemoryRecord[] | null> => {
+  return async ({ descriptor, events, fromOffset, onProgress }): Promise<MemoryRecord[] | null> => {
     if (events.length === 0) return null;
+
+    // The per-call channel wins when the caller supplies one, because it knows
+    // which session this is and the distiller is reused across all of them.
+    const report = onProgress ?? options.onProgress ?? (() => {});
 
     /*
      * Forks the session recorded literally are taken as given rather than
@@ -204,7 +213,7 @@ export function createDistiller(options: DistillerOptions): Distiller {
     const batch = chunkEvents(events, { chunkSize });
 
     if (chunkSize > requested) {
-      options.onProgress?.(
+      report(
         `session ${descriptor.sessionId}: ${events.length} events, widening chunks to ${chunkSize} to cover it in ${batch.length} calls`,
       );
     }
@@ -213,6 +222,11 @@ export function createDistiller(options: DistillerOptions): Distiller {
     const failures: unknown[] = [];
 
     for (const chunk of batch) {
+      // Said before the call rather than after it. Each chunk is a model call
+      // that takes the better part of a minute, and the wait is the part that
+      // needs explaining, not the result.
+      report(`chunk ${chunk.index + 1} of ${chunk.total}`);
+
       const inChunk = forks.filter(
         (fork) => fork.offset >= chunk.fromOffset && fork.offset <= chunk.toOffset,
       );
@@ -247,7 +261,7 @@ export function createDistiller(options: DistillerOptions): Distiller {
           lastError = error;
           if (attempt >= attempts || !isWorthRetrying(error)) break;
 
-          options.onProgress?.(
+          report(
             `session ${descriptor.sessionId}: chunk ${chunk.index + 1} of ${chunk.total} ` +
               `failed (${(error as RunnerError).kind}), retrying ${attempt + 1} of ${attempts}`,
           );
@@ -259,6 +273,9 @@ export function createDistiller(options: DistillerOptions): Distiller {
         // One bad chunk must not cost the whole session. A long session is
         // exactly where losing everything hurts most.
         failures.push(lastError);
+        report(
+          `chunk ${chunk.index + 1} of ${chunk.total} gave up: ${describeFailure(lastError)}`,
+        );
       }
     }
 
@@ -285,6 +302,8 @@ export function createDistiller(options: DistillerOptions): Distiller {
 
     // Some chunks failed and others did not. Say so, so the sweep can keep
     // these records without treating the session as fully read.
-    return failures.length > 0 ? markPartial(distilled, failures.length) : distilled;
+    return failures.length > 0
+      ? markPartial(distilled, failures.length, failures.map(describeFailure))
+      : distilled;
   };
 }

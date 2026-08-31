@@ -10,7 +10,54 @@ export interface SweepOptions {
   now?: Date;
   /** Caps work per invocation so a first run over a large backlog stays responsive. */
   maxSessions?: number;
+  /**
+   * Called as the sweep advances.
+   *
+   * A first sync over an established repository is minutes of model calls, and
+   * without this it is minutes of a cursor sitting on an empty line. There is
+   * no way for the person watching to tell that apart from a hang, so they kill
+   * it, and the work is lost.
+   */
+  onProgress?: (event: SweepProgress) => void;
+  /**
+   * Saves one session's records before the next one is started.
+   *
+   * A sweep over an established repository runs for tens of minutes. Holding
+   * every record until the last session finished meant a sweep that was
+   * interrupted, or that fell over on session nine of twelve, kept nothing at
+   * all and started from the beginning next time. Throwing from here marks the
+   * session failed, so its watermark stays put and it is read again rather than
+   * being counted as done with nothing written.
+   */
+  onSession?: (session: SweptSession) => Promise<void> | void;
 }
+
+/**
+ * What the sweep is doing, in a shape the caller can render however it likes.
+ *
+ * Structured rather than pre-formatted strings, because the counts are the
+ * point: a terminal wants to overwrite one line with "3 of 12", a log file
+ * wants a line each, and neither should have to parse prose to get there.
+ */
+export type SweepProgress =
+  /** Discovery finished. Everything after this is bounded by `eligible`. */
+  | { phase: 'planned'; discovered: number; eligible: number; deferred: number }
+  /** A session is about to be read from disk. */
+  | { phase: 'reading'; index: number; total: number; sessionId: string; adapter: string }
+  /** The session was read, and distillation is starting on this many events. */
+  | { phase: 'distilling'; index: number; total: number; sessionId: string; events: number }
+  /** Progress from inside the distiller, which knows about chunks and retries. */
+  | { phase: 'note'; index: number; total: number; sessionId: string; message: string }
+  /** A session finished, one way or another. */
+  | {
+      phase: 'done';
+      index: number;
+      total: number;
+      sessionId: string;
+      records: number;
+      outcome: 'distilled' | 'ingest-only' | 'partial' | 'failed';
+      reason?: string;
+    };
 
 /**
  * Turns a quiet session's new events into records.
@@ -23,6 +70,13 @@ export type Distiller = (input: {
   descriptor: SessionDescriptor;
   events: MemoryEvent[];
   fromOffset: number;
+  /**
+   * Where to send progress for this session.
+   *
+   * Per call rather than per distiller, because the distiller is built once and
+   * reused across sessions while the sweep knows which session is in hand.
+   */
+  onProgress?: (message: string) => void;
 }) => Promise<MemoryRecord[] | null>;
 
 /**
@@ -36,16 +90,40 @@ export type Distiller = (input: {
  */
 export const PARTIAL = Symbol.for('trackway.partialDistillation');
 
-export function markPartial(records: MemoryRecord[], failures: number): MemoryRecord[] {
+interface PartialMark {
+  count: number;
+  reasons: string[];
+}
+
+export function markPartial(
+  records: MemoryRecord[],
+  failures: number,
+  reasons: readonly string[] = [],
+): MemoryRecord[] {
   return Object.defineProperty(records, PARTIAL, {
-    value: failures,
+    value: { count: failures, reasons: [...reasons] } satisfies PartialMark,
     enumerable: false,
   }) as MemoryRecord[];
 }
 
-export function partialFailures(records: MemoryRecord[] | null): number {
+function partialMark(records: MemoryRecord[] | null): PartialMark | undefined {
   const value = records === null ? undefined : (records as unknown as Record<symbol, unknown>)[PARTIAL];
-  return typeof value === 'number' ? value : 0;
+  // Older marks carried the count alone. Reading both costs nothing and keeps
+  // a records array built by anything else from being misread as complete.
+  if (typeof value === 'number') return { count: value, reasons: [] };
+  if (value && typeof value === 'object' && typeof (value as PartialMark).count === 'number') {
+    return value as PartialMark;
+  }
+  return undefined;
+}
+
+export function partialFailures(records: MemoryRecord[] | null): number {
+  return partialMark(records)?.count ?? 0;
+}
+
+/** Why the regions that failed failed, for reporting rather than for logic. */
+export function partialReasons(records: MemoryRecord[] | null): string[] {
+  return partialMark(records)?.reasons ?? [];
 }
 
 export interface SweptSession {
@@ -57,6 +135,8 @@ export interface SweptSession {
   undistilled: boolean;
   /** How many regions failed after retries. Their events are retried next sweep. */
   partial?: number;
+  /** Why those regions failed. A count alone cannot be acted on. */
+  partialReasons?: string[];
 }
 
 export interface SweepFailure {
@@ -119,18 +199,62 @@ export async function runSweep(
   const batch = eligible.slice(0, cap);
   result.deferred = eligible.length - batch.length;
 
-  for (const { descriptor, adapter } of batch) {
+  const report = options.onProgress ?? (() => {});
+  const total = batch.length;
+
+  /**
+   * Hands one finished session to the caller, then keeps it.
+   *
+   * Ordered this way on purpose: if saving throws, the exception reaches the
+   * per-session catch below, the watermark stays where it was, and the session
+   * is read again next sweep. Recording it as swept first would report work
+   * that is not on disk.
+   */
+  const keep = async (session: SweptSession): Promise<void> => {
+    await options.onSession?.(session);
+    result.swept.push(session);
+  };
+
+  /**
+   * Writes the watermarks earned so far.
+   *
+   * After every session rather than once at the end. A sweep of a large
+   * backlog runs for tens of minutes and gets interrupted; saving only at the
+   * end threw away every session it had already paid for.
+   */
+  const checkpoint = async (): Promise<void> => {
+    await saveState(options.cacheDir, state).catch(() => {
+      // A state write failure costs re-distillation next run, not correctness.
+    });
+  };
+
+  report({
+    phase: 'planned',
+    discovered: discovered.length,
+    eligible: eligible.length,
+    deferred: result.deferred,
+  });
+
+  for (const [position, { descriptor, adapter }] of batch.entries()) {
     const key = stateKey(descriptor.adapter, descriptor.sessionId);
     const previous = state.sessions[key];
     const fromOffset = previous?.watermark ?? -1;
+    const index = position + 1;
+    const where = { index, total, sessionId: descriptor.sessionId } as const;
+
+    report({ phase: 'reading', ...where, adapter: descriptor.adapter });
 
     try {
       const events = await adapter.readSession(descriptor, { fromOffset });
 
       if (events.length === 0) {
+        report({ phase: 'done', ...where, records: 0, outcome: 'distilled' });
         recordSuccess(state, key, descriptor, fromOffset, now);
+        await checkpoint();
         continue;
       }
+
+      report({ phase: 'distilling', ...where, events: events.length });
 
       const highestOffset = events.reduce(
         (max, event) => Math.max(max, event.source.offset),
@@ -138,42 +262,60 @@ export async function runSweep(
       );
 
       if (!adapter.capabilities.canDistill) {
-        result.swept.push({
+        await keep({
           sessionId: descriptor.sessionId,
           adapter: descriptor.adapter,
           records: [],
           eventCount: events.length,
           undistilled: true,
         });
+        report({ phase: 'done', ...where, records: 0, outcome: 'ingest-only' });
         // The watermark still advances. Re-reading events we cannot distil
         // every sweep would be wasted work with no different outcome.
         recordSuccess(state, key, descriptor, highestOffset, now);
+        await checkpoint();
         continue;
       }
 
-      const records = await distill({ descriptor, events, fromOffset });
+      const records = await distill({
+        descriptor,
+        events,
+        fromOffset,
+        onProgress: (message) => report({ phase: 'note', ...where, message }),
+      });
 
       if (records === null) {
-        result.swept.push({
+        await keep({
           sessionId: descriptor.sessionId,
           adapter: descriptor.adapter,
           records: [],
           eventCount: events.length,
           undistilled: true,
         });
+        report({ phase: 'done', ...where, records: 0, outcome: 'ingest-only' });
         recordSuccess(state, key, descriptor, highestOffset, now);
+        await checkpoint();
         continue;
       }
 
       const unread = partialFailures(records);
+      const reasons = partialReasons(records);
 
-      result.swept.push({
+      await keep({
         sessionId: descriptor.sessionId,
         adapter: descriptor.adapter,
         records,
         eventCount: events.length,
         undistilled: false,
-        ...(unread > 0 ? { partial: unread } : {}),
+        ...(unread > 0 ? { partial: unread, partialReasons: reasons } : {}),
+      });
+
+      report({
+        phase: 'done',
+        ...where,
+        records: records.length,
+        outcome: unread > 0 ? 'partial' : 'distilled',
+        ...(unread > 0 && reasons[0] ? { reason: reasons[0] } : {}),
       });
 
       if (unread > 0) {
@@ -190,19 +332,20 @@ export async function runSweep(
       } else {
         recordSuccess(state, key, descriptor, highestOffset, now);
       }
+
+      await checkpoint();
     } catch (error) {
+      const reason = String(error instanceof Error ? error.message : error);
       result.failures.push({
         sessionId: descriptor.sessionId,
         adapter: descriptor.adapter,
-        reason: String(error instanceof Error ? error.message : error),
+        reason,
       });
+      report({ phase: 'done', ...where, records: 0, outcome: 'failed', reason });
       recordFailure(state, key, descriptor, previous, now, error);
+      await checkpoint();
     }
   }
-
-  await saveState(options.cacheDir, state).catch(() => {
-    // A state write failure costs re-distillation next run, not correctness.
-  });
 
   return result;
 }

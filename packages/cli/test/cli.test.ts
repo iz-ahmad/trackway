@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HOOK_MARKER,
   ensureIgnoreRules,
@@ -24,6 +24,8 @@ import {
   searchCommand,
   statusCommand,
   sessionsCommand,
+  sweepReporter,
+  syncCommand,
   showCommand,
   whyCommand,
   writeConfig,
@@ -36,10 +38,18 @@ const run = promisify(execFile);
 let repo: string;
 let previousCwd: string;
 
-function captureIo(): Io & { lines: string[]; errors: string[] } {
+function captureIo(): Io & { lines: string[]; errors: string[]; statuses: string[] } {
   const lines: string[] = [];
   const errors: string[] = [];
-  return { lines, errors, out: (line) => lines.push(line), err: (line) => errors.push(line) };
+  const statuses: string[] = [];
+  return {
+    lines,
+    errors,
+    statuses,
+    out: (line) => lines.push(line),
+    err: (line) => errors.push(line),
+    status: (line) => statuses.push(line),
+  };
 }
 
 function decisionRecord(overrides: Partial<Extract<MemoryRecord, { type: 'decision' }>> = {}) {
@@ -707,5 +717,229 @@ describe('reported version', () => {
 
     const declared = /\.version\('([^']+)'\)/.exec(source)?.[1];
     expect(declared).toBe(manifest.version);
+  });
+});
+
+
+describe('showing progress through a sync', () => {
+  // A sync spends most of its time inside one model call that runs for
+  // minutes. A line that only changes when a session finishes looks exactly
+  // like a hang, gets killed, and the work is lost.
+  it('says how many sessions there are before spending minutes on them', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({ phase: 'planned', discovered: 40, eligible: 12, deferred: 0 });
+
+    expect(io.lines.join(' ')).toContain('12 session(s) to sync');
+  });
+
+  it('says plainly when there is nothing to do', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({ phase: 'planned', discovered: 40, eligible: 0, deferred: 0 });
+
+    expect(io.lines.join(' ')).toContain('Nothing to sync');
+  });
+
+  it('names the sessions a cap left behind, so the backlog is not a surprise', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({ phase: 'planned', discovered: 40, eligible: 12, deferred: 7 });
+
+    expect(io.lines.join(' ')).toContain('7 left for the next run');
+  });
+
+  it('counts done against total on the status line', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({
+      phase: 'distilling',
+      index: 3,
+      total: 12,
+      sessionId: 'abcdef0123456789',
+      events: 842,
+    });
+
+    expect(io.statuses.join(' ')).toContain('[3/12] abcdef01');
+    expect(io.statuses.join(' ')).toContain('842 events');
+  });
+
+  it('passes a note from inside the distiller straight through', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({
+      phase: 'note',
+      index: 1,
+      total: 2,
+      sessionId: 'abcdef0123456789',
+      message: 'chunk 4 of 9',
+    });
+
+    expect(io.statuses.join(' ')).toContain('chunk 4 of 9');
+  });
+
+  // A status line is overwritten by the next session. A failure has to outlive
+  // it or the run ends with no trace of what went wrong.
+  it('keeps a failed session on screen rather than overwriting it', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({
+      phase: 'done',
+      index: 2,
+      total: 4,
+      sessionId: 'abcdef0123456789',
+      records: 0,
+      outcome: 'failed',
+      reason: 'claude-code: could not start claude',
+    });
+
+    expect(io.errors.join(' ')).toContain('could not start claude');
+    // Off a terminal the status line is a printed line too, so writing both
+    // said it twice.
+    expect(io.statuses.filter(Boolean)).toEqual([]);
+  });
+
+  it('clears the status line when the last session finishes', () => {
+    const io = captureIo();
+
+    sweepReporter(io).report({
+      phase: 'done',
+      index: 4,
+      total: 4,
+      sessionId: 'abcdef0123456789',
+      records: 3,
+      outcome: 'distilled',
+    });
+
+    expect(io.statuses.at(-1)).toBe('');
+  });
+
+  it('does not repeat a line that says the same thing, off a terminal', () => {
+    const io = captureIo();
+    const reporter = sweepReporter(io);
+
+    const event = {
+      phase: 'note',
+      index: 1,
+      total: 2,
+      sessionId: 'abcdef0123456789',
+      message: 'chunk 4 of 9',
+    } as const;
+
+    reporter.report(event);
+    reporter.report(event);
+
+    expect(io.statuses).toHaveLength(1);
+  });
+});
+
+describe('the progress line on a terminal', () => {
+  function terminalIo(): Io & { statuses: string[] } {
+    const statuses: string[] = [];
+    return {
+      out: () => undefined,
+      err: () => undefined,
+      status: (line) => statuses.push(line),
+      interactive: true,
+      statuses,
+    };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows a bar and a session count, not just the current session', () => {
+    const io = terminalIo();
+    const reporter = sweepReporter(io);
+
+    reporter.report({ phase: 'planned', discovered: 40, eligible: 4, deferred: 0 });
+    reporter.report({
+      phase: 'done',
+      index: 1,
+      total: 4,
+      sessionId: 'aaaaaaaa1111',
+      records: 2,
+      outcome: 'distilled',
+    });
+    reporter.report({ phase: 'reading', index: 2, total: 4, sessionId: 'bbbbbbbb2222', adapter: 'claude-code' });
+    reporter.finish();
+
+    const drawn = io.statuses.at(-2) ?? '';
+    expect(drawn).toContain('1/4 sessions');
+    expect(drawn).toContain('█');
+    expect(drawn).toContain('░');
+    expect(drawn).toContain('bbbbbbbb');
+  });
+
+  // The spinner is the part that says the process is alive during a model call
+  // that reports nothing for minutes.
+  it('keeps moving while nothing new is reported', () => {
+    vi.useFakeTimers();
+
+    const io = terminalIo();
+    const reporter = sweepReporter(io, { frameMs: 50 });
+
+    reporter.report({ phase: 'note', index: 1, total: 4, sessionId: 'aaaaaaaa1111', message: 'chunk 1 of 9' });
+    const first = io.statuses.length;
+
+    vi.advanceTimersByTime(200);
+
+    expect(io.statuses.length).toBeGreaterThan(first);
+    expect(new Set(io.statuses.map((line) => line.slice(0, 1))).size).toBeGreaterThan(1);
+
+    reporter.finish();
+  });
+
+  it('stops animating once the sync is over', () => {
+    vi.useFakeTimers();
+
+    const io = terminalIo();
+    const reporter = sweepReporter(io, { frameMs: 50 });
+
+    reporter.report({ phase: 'note', index: 1, total: 4, sessionId: 'aaaaaaaa1111', message: 'chunk 1 of 9' });
+    reporter.finish();
+
+    const settled = io.statuses.length;
+    vi.advanceTimersByTime(500);
+
+    expect(io.statuses).toHaveLength(settled);
+    expect(io.statuses.at(-1)).toBe('');
+  });
+
+  it('wipes the line before printing a failure under it', () => {
+    const io = terminalIo();
+    const reporter = sweepReporter(io);
+
+    reporter.report({ phase: 'reading', index: 1, total: 2, sessionId: 'aaaaaaaa1111', adapter: 'claude-code' });
+    reporter.report({
+      phase: 'done',
+      index: 1,
+      total: 2,
+      sessionId: 'aaaaaaaa1111',
+      records: 0,
+      outcome: 'failed',
+      reason: 'claude-code: timed out',
+    });
+    reporter.finish();
+
+    expect(io.statuses).toContain('');
+  });
+});
+
+describe('sync in a repository with no sessions of its own', () => {
+  it('says so and reports how long it took, rather than printing nothing', async () => {
+    const io = captureIo();
+
+    expect(await syncCommand({}, io)).toBe(0);
+    expect(io.lines.join('\n')).toContain('Nothing to sync');
+    expect(io.lines.join('\n')).toMatch(/Swept 0 session\(s\) in \d+s\./);
+  });
+
+  it('prints nothing at all when asked to be quiet, for the hook path', async () => {
+    const io = captureIo();
+
+    expect(await syncCommand({ quiet: true }, io)).toBe(0);
+    expect([...io.lines, ...io.errors, ...io.statuses]).toEqual([]);
   });
 });

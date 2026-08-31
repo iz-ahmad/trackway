@@ -11,10 +11,13 @@ import {
   loadState,
   purgeCache,
   markPartial,
+  partialFailures,
+  partialReasons,
   runSweep,
   saveState,
   stateKey,
   type Distiller,
+  type SweepProgress,
 } from '../src/index.js';
 
 const NOW = new Date('2026-08-25T12:00:00Z');
@@ -561,5 +564,240 @@ describe('a session where only part could be read', () => {
     const key = Object.keys(after.sessions)[0]!;
 
     expect(after.sessions[key]?.watermark).toBe(2);
+  });
+});
+
+
+describe('saying what it is doing while it does it', () => {
+  function twoSessions() {
+    const events = new Map([
+      ['ses-1', [eventAt(0, 'ses-1'), eventAt(1, 'ses-1')]],
+      ['ses-2', [eventAt(0, 'ses-2')]],
+    ]);
+
+    return new AdapterRegistry([
+      new FakeAdapter(
+        'fake',
+        [descriptor(), descriptor({ sessionId: 'ses-2', sessionFile: '/tmp/ses-2.jsonl' })],
+        events,
+      ),
+    ]);
+  }
+
+  async function sweepReporting(
+    registry: AdapterRegistry,
+    distill: Distiller,
+    options: { maxSessions?: number } = {},
+  ): Promise<SweepProgress[]> {
+    const seen: SweepProgress[] = [];
+    await runSweep(registry, distill, {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onProgress: (event) => seen.push(event),
+      ...options,
+    });
+    return seen;
+  }
+
+  // A first sync over an established repository is tens of minutes of model
+  // calls. Without a count there is no way to tell it from a hang.
+  it('says how much there is to do before it starts doing it', async () => {
+    const seen = await sweepReporting(twoSessions(), countingDistiller());
+
+    expect(seen[0]).toEqual({ phase: 'planned', discovered: 2, eligible: 2, deferred: 0 });
+  });
+
+  it('counts each session against the total as it goes', async () => {
+    const seen = await sweepReporting(twoSessions(), countingDistiller());
+
+    const done = seen.filter((event) => event.phase === 'done');
+    expect(done.map((event) => `${event.index}/${event.total}`)).toEqual(['1/2', '2/2']);
+  });
+
+  it('reports the sessions a cap left for the next run', async () => {
+    const seen = await sweepReporting(twoSessions(), countingDistiller(), { maxSessions: 1 });
+
+    expect(seen[0]).toMatchObject({ eligible: 2, deferred: 1 });
+    expect(seen.filter((event) => event.phase === 'done')).toHaveLength(1);
+  });
+
+  it('says how many events a session has, since that is what the wait scales with', async () => {
+    const seen = await sweepReporting(twoSessions(), countingDistiller());
+
+    expect(seen.find((event) => event.phase === 'distilling')).toMatchObject({
+      sessionId: 'ses-1',
+      events: 2,
+    });
+  });
+
+  // The distiller is built once and reused, so it cannot name the session
+  // itself. The sweep hands it a channel that already knows.
+  it('carries a note from inside the distiller under the right session', async () => {
+    const chatty: Distiller = async ({ onProgress }) => {
+      onProgress?.('chunk 1 of 3');
+      return [];
+    };
+
+    const seen = await sweepReporting(twoSessions(), chatty);
+
+    expect(seen.find((event) => event.phase === 'note')).toMatchObject({
+      sessionId: 'ses-1',
+      index: 1,
+      total: 2,
+      message: 'chunk 1 of 3',
+    });
+  });
+
+  it('reports a failed session with the reason rather than only a count', async () => {
+    const events = new Map([['ses-1', [eventAt(0)]]]);
+    const registry = new AdapterRegistry([
+      new FakeAdapter('fake', [descriptor()], events, {}, 'ses-1'),
+    ]);
+
+    const seen = await sweepReporting(registry, countingDistiller());
+
+    expect(seen.at(-1)).toMatchObject({
+      phase: 'done',
+      outcome: 'failed',
+      reason: 'session file vanished',
+    });
+  });
+
+  it('reports a session that could only be read in part', async () => {
+    const events = new Map([['ses-1', [eventAt(0)]]]);
+    const registry = new AdapterRegistry([new FakeAdapter('fake', [descriptor()], events)]);
+
+    const seen = await sweepReporting(
+      registry,
+      async () => markPartial([recordFor('ses-1', 'kept')], 1, ['claude-code: timed out']),
+    );
+
+    expect(seen.at(-1)).toMatchObject({ phase: 'done', outcome: 'partial' });
+  });
+});
+
+describe('why part of a session could not be read', () => {
+  it('carries the reason alongside the count', async () => {
+    const events = new Map([['ses-1', [eventAt(0)]]]);
+    const registry = new AdapterRegistry([new FakeAdapter('fake', [descriptor()], events)]);
+
+    const result = await runSweep(
+      registry,
+      async () => markPartial([recordFor('ses-1', 'kept')], 1, ['claude-code: timed out after 300000ms']),
+      { cacheDir, quietWindowMinutes: 15, now: NOW },
+    );
+
+    expect(result.swept[0]?.partialReasons).toEqual(['claude-code: timed out after 300000ms']);
+  });
+
+  // A count alone said something went wrong and nothing about what.
+  it('reads a mark that carries no reasons as no reasons rather than as complete', () => {
+    expect(partialReasons(markPartial([], 2))).toEqual([]);
+    expect(partialFailures(markPartial([], 2))).toBe(2);
+  });
+});
+
+
+describe('keeping what a long sweep has already earned', () => {
+  function twoSessions() {
+    const events = new Map([
+      ['ses-1', [eventAt(0, 'ses-1'), eventAt(1, 'ses-1')]],
+      ['ses-2', [eventAt(0, 'ses-2')]],
+    ]);
+
+    return new AdapterRegistry([
+      new FakeAdapter(
+        'fake',
+        [descriptor(), descriptor({ sessionId: 'ses-2', sessionFile: '/tmp/ses-2.jsonl' })],
+        events,
+      ),
+    ]);
+  }
+
+  it('hands over each session as it finishes rather than all of them at the end', async () => {
+    const handed: Array<{ sessionId: string; records: number }> = [];
+
+    await runSweep(twoSessions(), countingDistiller(), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onSession: (session) =>
+        void handed.push({ sessionId: session.sessionId, records: session.records.length }),
+    });
+
+    expect(handed).toEqual([
+      { sessionId: 'ses-1', records: 2 },
+      { sessionId: 'ses-2', records: 1 },
+    ]);
+  });
+
+  // A sweep of a backlog runs for tens of minutes and gets interrupted. Saving
+  // only at the end threw away every session it had already paid for.
+  it('writes the watermark for a finished session before starting the next', async () => {
+    const watermarksSeenDuringSecond: Array<number | undefined> = [];
+
+    await runSweep(twoSessions(), countingDistiller(), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onSession: async (session) => {
+        if (session.sessionId !== 'ses-2') return;
+        const onDisk = await loadState(cacheDir);
+        watermarksSeenDuringSecond.push(onDisk.sessions[stateKey('fake', 'ses-1')]?.watermark);
+      },
+    });
+
+    expect(watermarksSeenDuringSecond).toEqual([1]);
+  });
+
+  // Saving is what makes a session done. Counting it as swept when the records
+  // never reached disk would advance the watermark past events nobody kept.
+  it('treats a session whose records could not be saved as failed', async () => {
+    const result = await runSweep(twoSessions(), countingDistiller(), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onSession: (session) => {
+        if (session.sessionId === 'ses-1') throw new Error('index is locked');
+      },
+    });
+
+    expect(result.failures).toEqual([
+      { sessionId: 'ses-1', adapter: 'fake', reason: 'index is locked' },
+    ]);
+    expect(result.swept.map((session) => session.sessionId)).toEqual(['ses-2']);
+  });
+
+  it('leaves that session\'s watermark alone, so it is read again', async () => {
+    await runSweep(twoSessions(), countingDistiller(), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onSession: (session) => {
+        if (session.sessionId === 'ses-1') throw new Error('index is locked');
+      },
+    });
+
+    const state = await loadState(cacheDir);
+    expect(state.sessions[stateKey('fake', 'ses-1')]?.watermark).toBe(-1);
+    expect(state.sessions[stateKey('fake', 'ses-2')]?.watermark).toBe(0);
+  });
+
+  it('keeps the sessions that did work when a later one fails', async () => {
+    const saved: string[] = [];
+
+    const result = await runSweep(twoSessions(), countingDistiller(), {
+      cacheDir,
+      quietWindowMinutes: 15,
+      now: NOW,
+      onSession: (session) => {
+        if (session.sessionId === 'ses-2') throw new Error('disk full');
+        saved.push(session.sessionId);
+      },
+    });
+
+    expect(saved).toEqual(['ses-1']);
+    expect(result.swept.map((session) => session.sessionId)).toEqual(['ses-1']);
   });
 });
