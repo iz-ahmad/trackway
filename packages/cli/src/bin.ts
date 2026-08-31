@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
   program
     .name('trackway')
-    .description('The history behind your code.')
+    .description('Answers why a line of code exists, from the agent session where it was decided.')
     .version('0.1.0')
     .showHelpAfterError();
 

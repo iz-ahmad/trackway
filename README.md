@@ -1,8 +1,8 @@
 # Trackway
 
-**Git tells you what your code became. Trackway tells you what it almost became, and why you decided against it.**
+**Trackway answers "why is this line like this?" using the coding-agent session where the decision was made, including the options that were turned down.**
 
-Trackway reads the session files your coding agent already writes to disk and turns them into a searchable, version-controlled record of the decisions behind your code, including the options you rejected and the reason each one was dropped.
+It reads the session files your coding agent already writes to disk, so there is nothing to record by hand. Coverage grows as you work, since every distilled session adds the decisions it contains.
 
 > **v0.1.0.** Everything runs end to end. Extraction quality is measured rather than assumed: see [How well does it work](#how-well-does-it-work).
 
@@ -20,13 +20,21 @@ Trackway reads the session files your coding agent already writes to disk and tu
 
 ## Why use this
 
-You plan a feature with an agent. You weigh three approaches and pick one. The argument against the two you dropped gets written down at the moment you are deciding, while you genuinely do not know the answer yet. Then it evaporates.
+You open a file and do not recognise a function in it. `git blame` says you committed it three weeks ago, which tells you nothing you wanted to know.
 
-Two weeks later you can ask Trackway *why didn't we use a background daemon?* and get the actual answer back:
+```
+$ trackway why packages/adapters/src/claude-code/parse.ts 30
 
-> **Background daemon only** — rejected. *Fails silently in many ways (doesn't start, crashes, two copies), hard to debug when broken.*
+Question: How should record identity be defined to remain stable across field updates?
+Chose:    Explicit identity core per record type: source region, type, and subject only
+          Denylist approach (hash everything except certain fields) changes ID when
+          status or other metadata changes, breaking references and supersession itself
+Decided by: AGENT, no explicit approval
+```
 
-Nothing else in your toolchain keeps that:
+You did not forget this. Your agent proposed it, you approved it in passing, and the reasoning only ever existed inside a session transcript. That is the ordinary case now rather than the exception: of the 30 decisions recorded while building Trackway itself, 29 were proposed by the agent and 18 had no explicit approval at all.
+
+The reasoning is written at the moment of deciding, while nobody yet knows the answer. Then the session ends and it evaporates. Nothing else in your toolchain keeps it:
 
 | Source | Records |
 | --- | --- |
@@ -47,7 +55,7 @@ Be honest about the fit. Trackway is not worth the disk space if:
 - You already write ADRs seriously. Heavy overlap.
 - You need a shared team decision log. This is single-developer and local. Records land in git, but there is no review gate, so a teammate has no particular reason to trust an automatically extracted record.
 
-The honest fit is a developer working with an agent across months, on a codebase they will still be in next year, who has already had the experience of not remembering why something is the way it is.
+The honest fit is a developer working with an agent across months, on a codebase they will still be in next year, who has already had the experience of opening a file and not knowing why it is the way it is.
 
 ## How it works
 
@@ -121,7 +129,7 @@ trackway graph                                # open the local explorer
 - **Decisions.** Every fork, ordered by how many options it recorded, each with the branches you did not take.
 - **Overview.** What the record holds and which topics are worth opening.
 
-All three share one rail of filters. Records are sorted into four kinds — *product*, *technical*, *your call*, and *working* — and only the first three are shown by default. On a real session that is 18 records out of 101.
+All three share one rail of filters. Records are sorted into four kinds (*product*, *technical*, *your call*, and *working*), and only the first three are shown by default. On a real session that is 18 records out of 101.
 
 Full reference:
 

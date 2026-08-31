@@ -167,7 +167,7 @@ export function App(): ReactElement {
           <div className="bar">
             <div className="wordmark">
               <h1>Trackway</h1>
-              <p>The history behind your code</p>
+              <p>Why your code is the way it is</p>
             </div>
 
             <div className="bar-end">

@@ -48,7 +48,12 @@ Extraction quality is measured, not gated: precision 0.57, recall 0.68 on sessio
 
 ## Brand Commitments
 
-Name: **Trackway**. Positioning line: "the history behind your code."
+Name: **Trackway**. Positioning line: "why your code is the way it is."
+
+The pitch leads with the question a reader already has in front of a line they
+did not write, rather than with the rejected options. Most decisions the tool
+records were proposed by the agent and approved in passing, so the reader is
+usually not remembering a choice. They are finding out what was chosen for them.
 
 Prose avoids em dashes and comma-stacked sentences, in the interface as well as the documentation.
 

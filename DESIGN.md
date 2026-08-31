@@ -1,6 +1,6 @@
 ---
 name: Trackway
-description: The history behind your code
+description: Why your code is the way it is
 colors:
   cloud-white: "#fcfcfa"
   cloud-sunk: "#f5f5f2"
