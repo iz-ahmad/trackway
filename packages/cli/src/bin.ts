@@ -115,7 +115,7 @@ async function main(): Promise<void> {
 
   program
     .command('graph')
-    .description('open the local explorer: timeline, decision map, project history')
+    .description('open the local explorer: story, decisions, overview')
     .option('-p, --port <n>', 'port to listen on', Number)
     .option('--no-open', 'do not launch a browser')
     .action(async (options) => process.exit(await graphCommandEntry(options, consoleIo)));
