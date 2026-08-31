@@ -344,15 +344,31 @@ code {
   box-shadow: 0 0 0 1px var(--focus);
 }
 
+.theme > span {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/*
+  Laid over the whole control, not placed inside it.
+
+  Transparent rather than hidden: a select with `display: none` or
+  `visibility: hidden` stops being focusable, and one sized to its own text
+  leaves the icon and the caret dead to the pointer, which is what they were.
+*/
 .theme select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   appearance: none;
   border: none;
   background: none;
   padding: 0;
   font: inherit;
-  font-size: 14px;
-  color: var(--ink-2);
+  color: transparent;
   cursor: pointer;
+  opacity: 0;
 }
 
 .theme select:focus {

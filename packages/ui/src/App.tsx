@@ -59,6 +59,15 @@ function ThemeChoice(): ReactElement {
   return (
     <div className="theme">
       <Icon />
+      <span>{THEME_LABEL[theme]}</span>
+      <Caret size={11} />
+
+      {/*
+        The select covers the whole control rather than sitting between the
+        icon and the caret. As a sibling it only ever received clicks on its
+        own text box, so pressing the icon did nothing. It is the real
+        control and carries the label; everything above it is the drawing.
+      */}
       <select
         value={theme}
         aria-label="Colour theme"
@@ -70,7 +79,6 @@ function ThemeChoice(): ReactElement {
           </option>
         ))}
       </select>
-      <Caret size={11} />
     </div>
   );
 }
