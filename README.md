@@ -16,7 +16,7 @@ Your coding agent already writes these sessions to disk. Trackway reads them, so
   </picture>
 </p>
 
-<p align="center"><sub>The <code>trackway graph</code> explorer, showing one record from Trackway's own development.</sub></p>
+<p align="center"><sub>The <code>trackway graph</code> explorer, showing one record from Trackway's own development. <a href="#open-the-explorer">Run it on your own repository</a>.</sub></p>
 
 ## Why use this
 
@@ -122,20 +122,41 @@ npm link            # puts `trackway` on your PATH
 
 Work with your agent normally. There are no commands to run during a session.
 
+### Open the explorer
+
+This is the fastest way to see what Trackway has. Two commands:
+
 ```bash
-trackway sync                                 # distil sessions that have gone quiet
-trackway why src/limit.ts 42                  # the decision behind this line
-trackway rejected --about caching             # options ruled out, and why
-trackway graph                                # open the local explorer
+trackway sync     # turn finished sessions into records
+trackway graph    # open the explorer in your browser
 ```
 
-`trackway graph` serves three views from your machine, with no account and no network:
+`sync` reads every session your agent has finished with and distils it into records. `graph` then serves the explorer at `http://127.0.0.1:7777` and opens your browser there. Press Ctrl+C to stop it.
+
+Nothing leaves your machine. No account, no network calls, no telemetry.
+
+```bash
+trackway graph --port 4000    # serve on a different port
+trackway graph --no-open      # start the server and leave the browser alone
+```
+
+It serves three views, and the screenshot at the top of this page is the second one:
 
 - **Story.** What happened on this project, grouped by topic, in the order it happened.
-- **Decisions.** Every fork, ordered by how many options it recorded, each with the branches you did not take.
+- **Decisions.** Every fork, ordered by how many options it recorded, each with the branches nobody took.
 - **Overview.** What the record holds and which topics are worth opening.
 
 All three share one rail of filters. Records are sorted into four kinds (*product*, *technical*, *your call*, and *working*), and only the first three are shown by default. On a real session that is 18 records out of 101.
+
+**If the explorer looks empty,** you have no records yet. Run `trackway sync` first. If that still finds nothing, run `trackway status` to see which agents Trackway found and what it is waiting on. A session has to go quiet before Trackway will distil it, so a conversation you are still in the middle of will not appear.
+
+### Ask from the terminal
+
+```bash
+trackway why src/limit.ts 42                  # the decision behind this line
+trackway rejected --about caching             # options ruled out, and why
+trackway search "rate limit"                  # anything matching, across sessions
+```
 
 Full reference:
 
