@@ -233,8 +233,15 @@ describe('hook installation', () => {
   });
 
   it('reports rather than throws when settings cannot be written', async () => {
+    // A regular file cannot contain a directory, so writing through one fails
+    // with ENOTDIR immediately, on every platform and for every user. The path
+    // here used to be under /proc, which does not exist on macOS and is a live
+    // kernel filesystem on Linux, so this passed locally and hung in CI.
+    const blocker = join(repo, 'not-a-directory');
+    await writeFile(blocker, '', 'utf8');
+
     const result = await installHook(
-      { agent: 'claude-code', settingsPath: '/proc/definitely/not/writable/settings.json' },
+      { agent: 'claude-code', settingsPath: join(blocker, 'settings.json') },
       hookCommand(),
     );
 

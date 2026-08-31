@@ -273,12 +273,18 @@ describe('failure modes', () => {
   });
 
   it('does not raise when the failure log itself cannot be written', async () => {
+    // Unwritable by construction rather than by platform: a path through a
+    // regular file fails with ENOTDIR everywhere, where /proc only behaved
+    // this way on macOS.
+    const blocker = join(repo, 'not-a-directory');
+    await writeFile(blocker, '', 'utf8');
+
     const result = await isolate(
       async () => {
         throw new Error('inner');
       },
       'fallback',
-      { operation: 'test', logPath: '/proc/nowhere/failures.log' },
+      { operation: 'test', logPath: join(blocker, 'failures.log') },
     );
 
     expect(result).toBe('fallback');
