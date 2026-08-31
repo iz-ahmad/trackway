@@ -1,8 +1,8 @@
 # Trackway
 
-**Trackway answers "why is this line like this?" using the coding-agent session where the decision was made, including the options that were turned down.**
+**Trackway answers "why is this line like this?" It reads the coding-agent session behind the decision and shows you the options that lost.**
 
-It reads the session files your coding agent already writes to disk, so there is nothing to record by hand. Coverage grows as you work, since every distilled session adds the decisions it contains.
+Your coding agent already writes these sessions to disk. Trackway reads them, so you record nothing by hand. The more you work, the more of your code it covers.
 
 > **v0.1.0.** Everything runs end to end. Extraction quality is measured rather than assumed: see [How well does it work](#how-well-does-it-work).
 
@@ -20,7 +20,11 @@ It reads the session files your coding agent already writes to disk, so there is
 
 ## Why use this
 
-You open a file and do not recognise a function in it. `git blame` says you committed it three weeks ago, which tells you nothing you wanted to know.
+We all code with agents now. We hand them decisions all day. Sometimes the agent stops, offers three options, and asks us to pick one. Usually we pick fast and move on.
+
+Those quick picks shape the software. Two months later you open the file and cannot work out why it does things this way. The agent explained itself at the time. You read the explanation, said yes, and closed the session. The reasoning went with it.
+
+Trackway keeps that reasoning. Point at any line and ask:
 
 ```
 $ trackway why packages/adapters/src/claude-code/parse.ts 30
@@ -32,30 +36,30 @@ Chose:    Explicit identity core per record type: source region, type, and subje
 Decided by: AGENT, no explicit approval
 ```
 
-You did not forget this. Your agent proposed it, you approved it in passing, and the reasoning only ever existed inside a session transcript. That is the ordinary case now rather than the exception: of the 30 decisions recorded while building Trackway itself, 29 were proposed by the agent and 18 had no explicit approval at all.
+You did not forget that decision. You never really made it. That is normal now. While building Trackway, the agent proposed 29 of the 30 decisions in these records. Nobody explicitly approved 18 of them.
 
-The reasoning is written at the moment of deciding, while nobody yet knows the answer. Then the session ends and it evaporates. Nothing else in your toolchain keeps it:
+Git, pull requests and ADRs each keep part of the story. None of them keep this part:
 
 | Source | Records |
 | --- | --- |
 | Git history | what you built |
 | PR descriptions | what you are shipping |
 | ADRs | what you decided, written afterward and quietly rationalized |
-| **Trackway** | **what you considered, and the case against each, written before the outcome was known** |
+| **Trackway** | **what you considered, and the case against each, while you were still deciding** |
 
-That last property is the one that is hard to fake. An architecture decision record written after the fact already knows how the story ended. These do not.
+You write an ADR afterwards, once you know how the story ended. Trackway writes these while you are still in the middle of it. That is the part you cannot reconstruct later.
 
-The second use is sharper than the first: **rejections expire.** "Conflicts with existing hooks, adds latency to commit" is only true while those conditions hold. When they change, that rejection is now wrong, and you can go find it.
+Rejections also expire. "Conflicts with existing hooks, adds latency to commit" was true when you wrote it. Conditions change. When they do, that rejection is wrong, and you can go and find it.
 
 ### When not to use it
 
-Be honest about the fit. Trackway is not worth the disk space if:
+Skip Trackway if:
 
-- The project is short-lived. You will remember.
-- You already write ADRs seriously. Heavy overlap.
-- You need a shared team decision log. This is single-developer and local. Records land in git, but there is no review gate, so a teammate has no particular reason to trust an automatically extracted record.
+- **The project is short-lived.** You will remember.
+- **You already write ADRs properly.** They overlap heavily.
+- **You need a team decision log.** Trackway is local and single-developer. Records land in git, but nothing reviews them, so your teammates have little reason to trust an automatically extracted record.
 
-The honest fit is a developer working with an agent across months, on a codebase they will still be in next year, who has already had the experience of opening a file and not knowing why it is the way it is.
+It fits best if you work with an agent for months on a codebase you will still be in next year, and you have already opened a file and had no idea why it works the way it does.
 
 ## How it works
 
@@ -153,7 +157,7 @@ Full reference:
 
 ## What gets stored
 
-Records are markdown with YAML front matter, one file per record, in `.trackway/records/`. They are meant to be committed. They show up in your diffs and your pull requests, which is the point: a decision that changed should be visible when it changes.
+Records are markdown with YAML front matter, one file per record, in `.trackway/records/`. Commit them. They show up in your diffs and pull requests, which is the point. When a decision changes, you see it change.
 
 Five record types: **question**, **discovery**, **decision**, **action**, **outcome**.
 
@@ -259,11 +263,11 @@ Two paths, measured separately. Averaging them would flatter the tool.
 
 **Distillation is model-extracted and imperfect.**
 
-**Recall is 0.93**, over 6 sessions of 1 to 26 decision points. Of the decisions a session is known to have made, nine in ten are found. It is scored against an answer key the sessions provide themselves: when a session records an option list and somebody answers it, that is ground truth with no hand labelling.
+**Recall is 0.93**, over 6 sessions of 1 to 26 decision points. Trackway finds nine in ten of the decisions a session is known to have made. The sessions supply the answer key themselves. When a session records an option list and somebody answers it, that is ground truth with no hand labelling.
 
-**Precision is roughly three in four, and that figure is not yet stable enough to pin down.** The key cannot measure it, because it only holds decisions made through an option list and most are made in conversation. So `trackway eval` judges each extracted record against the transcript it came from, as sound, distorted or invented. The judge was checked in both directions before being trusted: against four planted records, three inventions and one real question with its answer inverted, it scores zero.
+**Precision is roughly three in four, and that figure is not yet stable enough to pin down.** The key cannot measure it, because it only holds decisions made through an option list and most are made in conversation. So `trackway eval` judges each extracted record against the transcript it came from, as sound, distorted or invented. The judge passes a check in both directions. Given four planted records (three inventions, and one real question with its answer inverted) it scores zero.
 
-Two measurements of precision have been published here and both were wrong, for different reasons, so this one is described rather than quoted until a run repeats itself. What is not in doubt: **some extracted decisions are invented**, meaning the session does not support them at all. Roughly one in four extracted decisions is either invented or states a real decision wrongly.
+This README has carried two precision numbers already. Both were wrong, for different reasons. So this one stays described rather than quoted until a run repeats itself. One thing is not in doubt: **some extracted decisions are invented**, meaning the session does not support them at all. Roughly one in four is either invented or states a real decision wrongly.
 
 That is the honest weak spot and the reason this is 0.x. Records are markdown in your repository and appear in your diffs, so they are reviewable, but do not trust them blindly yet.
 

@@ -90,7 +90,7 @@ await writeFile(
     {
       name: manifest.name,
       version: manifest.version,
-      description: 'Answers why a line of code exists, from the agent session where it was decided.',
+      description: 'Answers why a line of code exists, using the agent session behind it.',
       keywords: [
         'ai',
         'coding-agent',
