@@ -262,9 +262,15 @@ export function createDistiller(options: DistillerOptions): Distiller {
       }
     }
 
-    if (records.length === 0 && failures.length > 0) {
+    if (records.length === 0 && harvested.length === 0 && failures.length > 0) {
       // Rethrow the original rather than wrapping it. The sweep distinguishes a
       // runner failure from invalid output, and a wrapper would erase that.
+      //
+      // Only when the harvest is empty too. Forks are read straight out of the
+      // session and cost no model call, so a runner that cannot start is no
+      // reason to discard them. Throwing here meant `trackway ingest` returned
+      // nothing at all on a machine with no agent installed, when everything
+      // the transcript recorded literally was already in hand.
       throw failures[0];
     }
 

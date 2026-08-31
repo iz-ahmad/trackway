@@ -332,6 +332,79 @@ describe('the distiller', () => {
     ).rejects.toThrow(InvalidDistillationError);
   });
 
+  it('keeps harvested forks when the runner cannot run at all', async () => {
+    // Forks are read straight out of the session and cost no model call, so a
+    // missing agent is no reason to lose them. This threw before, which is why
+    // `trackway ingest` produced nothing on a machine without an agent even
+    // when the transcript recorded every option literally.
+    const fork: MemoryEvent = {
+      id: 'e-0',
+      sessionId: 'ses-1',
+      timestamp: '2026-08-26T09:00:00Z',
+      type: 'tool_call',
+      actor: { type: 'agent', id: 'agent:claude-code' },
+      payload: {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tu-1',
+            name: 'AskUserQuestion',
+            input: {
+              questions: [
+                {
+                  question: 'What should trigger passive distillation?',
+                  header: 'Trigger',
+                  options: [
+                    { label: 'Agent hook', description: 'Records exist at commit time.' },
+                    { label: 'Background daemon', description: 'A process to supervise.' },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+      source: { adapter: 'claude-code', sessionFile: '/tmp/a.jsonl', offset: 0 },
+    };
+
+    // The answer is what turns a recorded fork into a decision rather than an
+    // open question.
+    const answer: MemoryEvent = {
+      id: 'e-1',
+      sessionId: 'ses-1',
+      timestamp: '2026-08-26T09:01:00Z',
+      type: 'tool_result',
+      actor: { type: 'agent', id: 'agent:claude-code' },
+      payload: {
+        content: [{ type: 'tool_result', tool_use_id: 'tu-1', content: 'Agent hook' }],
+      },
+      source: { adapter: 'claude-code', sessionFile: '/tmp/a.jsonl', offset: 1 },
+    };
+
+    const dead: DistillRunner = {
+      id: 'stub',
+      async isAvailable() {
+        return { available: false, reason: 'claude could not be run' };
+      },
+      async run() {
+        throw new RunnerError('stub', 'exit', 'claude could not be run');
+      },
+    };
+
+    const records = await createDistiller({ runner: dead, retryDelayMs: 0 })({
+      descriptor,
+      events: [fork, answer],
+      fromOffset: -1,
+    });
+
+    expect(records?.length).toBeGreaterThan(0);
+    const decision = records?.find((record) => record.type === 'decision');
+    expect(decision).toBeDefined();
+    // The option nobody took survives too, which is the whole reason the
+    // deterministic path exists.
+    expect(JSON.stringify(decision)).toContain('Background daemon');
+  });
+
   it('propagates a runner failure', async () => {
     const failing: DistillRunner = {
       id: 'stub',
