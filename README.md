@@ -20,11 +20,13 @@ Your coding agent already writes these sessions to disk. Trackway reads them, so
 
 ## Why use this
 
-We all code with agents now. We hand them decisions all day. Sometimes the agent stops, offers three options, and asks us to pick one. Usually we pick fast and move on.
+We all code with agents now. We hand them decisions all day. Sometimes the agent stops, offers three options, and asks us to pick one. We usually pick fast and move on.
 
-Those quick picks shape the software. Two months later you open the file and cannot work out why it does things this way. The agent explained itself at the time. You read the explanation, said yes, and closed the session. The reasoning went with it.
+Most of the time it never asks. It weighs the options itself, picks one, gives a line of reasoning, and carries on building.
 
-Trackway keeps that reasoning. Point at any line and ask:
+Both kinds shape the software. Two months later you open the file and cannot work out why it works this way. The reasoning existed once, in a chat window, for about a minute. Then the session closed and took it along.
+
+Trackway keeps that reasoning. It does not matter whether you chose or the agent chose. Point at any line and ask:
 
 ```
 $ trackway why packages/adapters/src/claude-code/parse.ts 30
@@ -122,8 +124,8 @@ Work with your agent normally. There are no commands to run during a session.
 
 ```bash
 trackway sync                                 # distil sessions that have gone quiet
-trackway why src/limit.ts 42                  # what was decided that produced this line
-trackway rejected --about caching             # options you dropped, and why
+trackway why src/limit.ts 42                  # the decision behind this line
+trackway rejected --about caching             # options ruled out, and why
 trackway graph                                # open the local explorer
 ```
 
@@ -142,7 +144,7 @@ Full reference:
 | `trackway init` | set up the current repository |
 | `trackway sync` | distil sessions that have gone quiet |
 | `trackway ingest [file]` | read a transcript from any agent, from a file or stdin |
-| `trackway why <file> [line]` | what was decided that produced this line, and what was rejected |
+| `trackway why <file> [line]` | the decision behind this line, and the options that lost |
 | `trackway status` | what is stored, which agents were found, what is pending |
 | `trackway search <query>` | full-text search across every record |
 | `trackway rejected [query]` | options considered and not taken |
