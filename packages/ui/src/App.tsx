@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactElement } from 'react';
 import { api } from './api.js';
-import { Monitor, Moon, Search as SearchIcon, Sun } from './icons.js';
+import { Caret, Monitor, Moon, Search as SearchIcon, Sun } from './icons.js';
 import { Rail } from './Rail.js';
-import { applyTheme, nextTheme, readTheme, type Theme } from './theme.js';
+import { applyTheme, readTheme, THEMES, type Theme } from './theme.js';
 import { Decisions } from './views/Decisions.js';
 import { History } from './views/History.js';
 import { Search } from './views/Search.js';
@@ -22,7 +22,7 @@ const LIT: Significance[] = ['business', 'technical', 'direction'];
 
 /** What each theme is called, and what the icon for it is. */
 const THEME_LABEL: Record<Theme, string> = {
-  system: 'Matching your system',
+  system: 'System',
   light: 'Light',
   dark: 'Dark',
 };
@@ -34,35 +34,44 @@ const THEME_ICON: Record<Theme, ComponentType<{ size?: number }>> = {
 };
 
 /**
- * Cycles the ground the interface is drawn on.
+ * Chooses the ground the interface is drawn on.
  *
- * One button rather than three, because the header is meant to stay quiet and
- * this is not what anyone came here to do. The label carries both halves of
- * the state a cycling control hides: what it is now, and what pressing it
- * does next.
+ * A list rather than a cycling button. Three states behind one button meant
+ * two clicks to reach dusk from the default and no way to see what the
+ * choices were without pressing it, which is the wrong trade for a control
+ * someone touches once and then leaves alone.
+ *
+ * A native select so the menu, the keyboard, and the screen reader all behave
+ * the way the reader's platform already does. The icon states the current
+ * ground; the select is transparent over it.
  */
-function ThemeToggle(): ReactElement {
+function ThemeChoice(): ReactElement {
   const [theme, setTheme] = useState<Theme>(() => readTheme());
 
-  // Runs once so a stored choice survives a reload. The inline script in the
-  // document has already applied it before paint; this only syncs React.
+  // The inline script in the document has already applied a stored choice
+  // before paint. This keeps the attribute in step with later changes.
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
   const Icon = THEME_ICON[theme];
-  const next = nextTheme(theme);
 
   return (
-    <button
-      type="button"
-      className="theme"
-      title={`Theme: ${THEME_LABEL[theme].toLowerCase()}. Switch to ${THEME_LABEL[next].toLowerCase()}.`}
-      aria-label={`Theme: ${THEME_LABEL[theme].toLowerCase()}. Switch to ${THEME_LABEL[next].toLowerCase()}.`}
-      onClick={() => setTheme(next)}
-    >
+    <div className="theme">
       <Icon />
-    </button>
+      <select
+        value={theme}
+        aria-label="Colour theme"
+        onChange={(event) => setTheme(event.target.value as Theme)}
+      >
+        {THEMES.map((option) => (
+          <option key={option} value={option}>
+            {THEME_LABEL[option]}
+          </option>
+        ))}
+      </select>
+      <Caret size={11} />
+    </div>
   );
 }
 
@@ -153,7 +162,8 @@ export function App(): ReactElement {
               <p>The history behind your code</p>
             </div>
 
-            <div className="omni">
+            <div className="bar-end">
+              <div className="omni">
               <SearchIcon />
               <input
                 type="search"
@@ -161,15 +171,17 @@ export function App(): ReactElement {
                 placeholder="Search decisions and discoveries"
                 aria-label="Search decisions and discoveries"
                 onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') setQuery('');
-                }}
-              />
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setQuery('');
+                  }}
+                />
+              </div>
+
+              <ThemeChoice />
             </div>
           </div>
 
-          <div className="tabrow">
-            <nav className="tabs" aria-label="Views">
+          <nav className="tabs" aria-label="Views">
             {TABS.map(([id, label]) => (
               <button
                 key={id}
@@ -182,11 +194,8 @@ export function App(): ReactElement {
               >
                 {label}
               </button>
-              ))}
-            </nav>
-
-            <ThemeToggle />
-          </div>
+            ))}
+          </nav>
         </div>
       </header>
 

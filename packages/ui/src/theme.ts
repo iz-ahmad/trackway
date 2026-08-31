@@ -40,8 +40,3 @@ export function applyTheme(theme: Theme): void {
     // The choice still applies to this page; it just will not outlive it.
   }
 }
-
-/** The next theme in the cycle the control walks through. */
-export function nextTheme(theme: Theme): Theme {
-  return THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]!;
-}

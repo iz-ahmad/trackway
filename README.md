@@ -10,13 +10,13 @@ Trackway reads the session files your coding agent already writes to disk and tu
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/me-shaon/trackway/main/docs/explorer-dark.png">
     <img
-      alt="The Trackway explorer showing one recorded decision: the question that was settled, the option chosen with the reasoning for it, four options that were not taken each with the reason it was dropped, who decided, and the two commits the decision shipped in."
+      alt="The Trackway explorer showing one recorded decision: whether record identifiers should be sequential or content-derived, the option chosen with the reasoning for it, the option that was not taken with the reason it was dropped, who decided it, and the two commits it shipped in."
       src="https://raw.githubusercontent.com/me-shaon/trackway/main/docs/explorer-light.png"
       width="900">
   </picture>
 </p>
 
-<p align="center"><sub><code>trackway graph</code>, run against this repository's own history.</sub></p>
+<p align="center"><sub>The <code>trackway graph</code> explorer, showing one record from Trackway's own development.</sub></p>
 
 ## Why use this
 
