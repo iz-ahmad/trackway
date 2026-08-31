@@ -11,8 +11,10 @@ import {
   type MemoryRecord,
 } from '@trackway/core';
 import {
-  ClaudeDistillRunner,
   createDistiller,
+  createRunnerChain,
+  defaultRunners,
+  insideDistillation,
   purgeCache,
   runSweep,
   type SweepProgress,
@@ -20,6 +22,7 @@ import {
 } from '@trackway/distill';
 import { isolate } from '@trackway/core';
 import { join } from 'node:path';
+import { acquireSyncLock } from './lock.js';
 import { openWorkspaceIndex, type Workspace } from './workspace.js';
 
 export interface SyncResult {
@@ -36,6 +39,8 @@ export interface SyncResult {
    * the person running it with nothing to go on.
    */
   errors: string[];
+  /** Set when the sweep deliberately did not run. Not a failure. */
+  halted?: string;
 }
 
 export interface SyncOptions {
@@ -55,6 +60,21 @@ function empty(): SyncResult {
 }
 
 /**
+ * A sweep distils by starting an agent session, and an agent runs the
+ * developer's hooks when a session ends. The hook Trackway installs starts a
+ * sweep. So a sweep's own subprocess fired the hook that starts a sweep, and
+ * each of those did it again: thirty-nine concurrent syncs on a real machine in
+ * a few minutes, each spending its own model calls.
+ *
+ * The agent flag that suppresses hooks also disables the OAuth this depends on,
+ * so the recursion is refused here instead. Doing it on Trackway's side has the
+ * advantage of holding for every agent rather than one agent's flags.
+ */
+const REENTRANT = 'already running inside a distillation; refusing to sweep recursively';
+
+const BUSY = 'another sync is already running for this repository';
+
+/**
  * Sweep, distil, write records, update the index.
  *
  * Nothing here throws. This runs from `trackway sync`, from every other
@@ -66,20 +86,32 @@ function empty(): SyncResult {
  * in `errors` for the caller to print.
  */
 export async function sync(workspace: Workspace, options: SyncOptions = {}): Promise<SyncResult> {
+  if (insideDistillation()) return { ...empty(), halted: REENTRANT };
+
+  // One sweep per repository. The hook fires per session ending, and three
+  // windows closing meant three sweeps racing over the same sessions, spending
+  // the same model calls and contending on the same index.
+  const lock = acquireSyncLock(workspace.cacheDir);
+  if (!lock) return { ...empty(), halted: BUSY };
+
   const errors: string[] = [];
 
-  const result = await isolate(() => runSync(workspace, options), empty(), {
-    operation: 'sync',
-    logPath: join(workspace.cacheDir, 'failures.log'),
-    onFailure: (failure) => errors.push(failure.message),
-  });
+  try {
+    const result = await isolate(() => runSync(workspace, options), empty(), {
+      operation: 'sync',
+      logPath: join(workspace.cacheDir, 'failures.log'),
+      onFailure: (failure) => errors.push(failure.message),
+    });
 
-  return { ...result, errors: [...result.errors, ...errors] };
+    return { ...result, errors: [...result.errors, ...errors] };
+  } finally {
+    lock.release();
+  }
 }
 
 async function runSync(workspace: Workspace, options: SyncOptions): Promise<SyncResult> {
   const registry = defaultRegistry();
-  const distill = createDistiller({ runner: new ClaudeDistillRunner() });
+  const distill = createDistiller({ runner: createRunnerChain(defaultRunners()) });
 
   let written = 0;
   let skipped = 0;
@@ -211,7 +243,7 @@ export async function ingestTranscript(
   const { descriptor, events } = parseTranscript(input);
 
   const distill = createDistiller({
-    runner: new ClaudeDistillRunner(),
+    runner: createRunnerChain(defaultRunners()),
     ...(options.now === undefined ? {} : { now: options.now }),
   });
 

@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process';
-import { RunnerError, type DistillRunner, type RunOptions } from './contract.js';
+import { mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { RunnerError, distillEnv, type DistillRunner, type RunOptions } from './contract.js';
 
 const RUNNER_ID = 'claude-code';
 /**
@@ -16,6 +19,26 @@ export interface ClaudeRunnerOptions {
   binary?: string;
   model?: string;
   timeoutMs?: number;
+  /** Where the subprocess runs. Exposed so tests need not touch the real one. */
+  workingDir?: string;
+}
+
+/**
+ * Where a distillation subprocess is run from.
+ *
+ * Not the repository, which is the whole point. Claude Code records the working
+ * directory in the session file it writes for every `-p` invocation, and
+ * Trackway matches sessions to a repository by exactly that field. Run from the
+ * repository and each distillation call produces a session that the next sweep
+ * discovers and distils, which produces another one. Thirty-five calls became
+ * thirty-five new sessions became thirty-five more calls, and it never settles.
+ *
+ * A directory that belongs to no repository breaks the loop at the source: the
+ * exhaust still exists, it just cannot be attributed to a repository, so it is
+ * never eligible for one.
+ */
+export function runnerWorkingDir(home: string = homedir()): string {
+  return join(home, '.trackway', 'runner');
 }
 
 /**
@@ -39,11 +62,13 @@ export class ClaudeDistillRunner implements DistillRunner {
   private readonly binary: string;
   private readonly model: string;
   private readonly timeoutMs: number;
+  private readonly workingDir: string;
 
   constructor(options: ClaudeRunnerOptions = {}) {
     this.binary = options.binary ?? 'claude';
     this.model = options.model ?? DEFAULT_DISTILL_MODEL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.workingDir = options.workingDir ?? runnerWorkingDir();
   }
 
   async isAvailable(): Promise<{ available: boolean; reason?: string }> {
@@ -108,7 +133,14 @@ export class ClaudeDistillRunner implements DistillRunner {
       let child: ReturnType<typeof spawn>;
 
       try {
-        child = spawn(this.binary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+        // Created rather than assumed: spawn fails outright if cwd is missing,
+        // and a missing directory would look like a missing binary.
+        mkdirSync(this.workingDir, { recursive: true });
+        child = spawn(this.binary, args, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          cwd: this.workingDir,
+          env: distillEnv(),
+        });
       } catch (cause) {
         reject(new RunnerError(RUNNER_ID, 'unavailable', `could not start ${this.binary}`, { cause }));
         return;
