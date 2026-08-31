@@ -211,6 +211,37 @@ function collectText(value: unknown, depth = 0): string[] {
   return [];
 }
 
+/**
+ * The opening line of the extraction prompt, used to recognise our own output.
+ *
+ * Every distillation call is itself a coding-agent session, and the agent
+ * records it like any other. Those sessions are then discovered and distilled,
+ * which produces more of them. Running from a directory that belongs to no
+ * repository stops new ones being attributed anywhere, but it cannot help the
+ * ones already written, and re-reading those costs a model call each to learn
+ * they contain nothing.
+ *
+ * Matching our own first line is exact rather than heuristic: the text is a
+ * constant in this file, and a real session containing it verbatim would be one
+ * discussing this extractor, which has nothing worth recording either.
+ */
+export const EXTRACTION_MARKER = EXTRACTION_INSTRUCTIONS.split('\n')[0] as string;
+
+/**
+ * True when these events are a distillation run rather than real work.
+ *
+ * The payload is adapter-shaped, so the text is found the same way the prompt
+ * renderer finds it rather than by guessing at a key. Assuming `payload.text`
+ * matched none of 151 real sessions, because Claude Code calls it `content`.
+ */
+export function isOwnExtraction(events: readonly MemoryEvent[]): boolean {
+  return events.some(
+    (event) =>
+      event.type === 'user_prompt' &&
+      collectText(event.payload).some((text) => text.includes(EXTRACTION_MARKER)),
+  );
+}
+
 export function buildPrompt(input: PromptInput): string {
   const transcript = renderTranscript(input.events);
 

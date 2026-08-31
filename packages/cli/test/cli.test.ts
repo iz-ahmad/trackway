@@ -26,6 +26,7 @@ import {
   sessionsCommand,
   sweepReporter,
   syncCommand,
+  acquireSyncLock,
   showCommand,
   whyCommand,
   writeConfig,
@@ -941,5 +942,91 @@ describe('sync in a repository with no sessions of its own', () => {
 
     expect(await syncCommand({ quiet: true }, io)).toBe(0);
     expect([...io.lines, ...io.errors, ...io.statuses]).toEqual([]);
+  });
+});
+
+describe('one sweep at a time', () => {
+  /*
+   * The hook fires when a session ends, and a developer with three windows
+   * open ends three sessions. Without a lock each starts its own sweep over
+   * the same sessions, spending the same model calls three times.
+   */
+  it('lets one caller hold the lock and turns the next away', async () => {
+    const cacheDir = join(repo, 'cache');
+
+    const first = acquireSyncLock(cacheDir);
+    expect(first).not.toBeNull();
+    expect(acquireSyncLock(cacheDir)).toBeNull();
+
+    first?.release();
+    const third = acquireSyncLock(cacheDir);
+    expect(third).not.toBeNull();
+    third?.release();
+  });
+
+  // A sweep that crashed must not stop every future one.
+  it('takes over a lock whose owner is gone', async () => {
+    const cacheDir = join(repo, 'cache');
+    await mkdir(cacheDir, { recursive: true });
+
+    // A pid that cannot be running, written as though a dead sweep left it.
+    await writeFile(
+      join(cacheDir, 'sync.lock'),
+      JSON.stringify({ pid: 2147483, startedAt: new Date().toISOString() }),
+      'utf8',
+    );
+
+    const lock = acquireSyncLock(cacheDir);
+    expect(lock).not.toBeNull();
+    lock?.release();
+  });
+
+  it('does not take over a lock a live process holds', async () => {
+    const cacheDir = join(repo, 'cache');
+    await mkdir(cacheDir, { recursive: true });
+
+    // This very process is alive, so its lock is real however old it looks.
+    await writeFile(
+      join(cacheDir, 'sync.lock'),
+      JSON.stringify({ pid: process.pid, startedAt: new Date(Date.now() - 10 * 60_000).toISOString() }),
+      'utf8',
+    );
+
+    expect(acquireSyncLock(cacheDir)).toBeNull();
+  });
+});
+
+describe('a sync started from inside a distillation', () => {
+  /*
+   * The distill subprocess is an agent session, and ending one runs the
+   * developer's hooks, including the hook that starts a sweep. On a real
+   * machine this reached thirty-nine concurrent syncs in a few minutes.
+   */
+  it('refuses rather than recursing, and says so plainly', async () => {
+    const io = captureIo();
+    const previous = process.env.TRACKWAY_DISTILLING;
+    process.env.TRACKWAY_DISTILLING = '1';
+
+    try {
+      expect(await syncCommand({}, io)).toBe(0);
+      expect(io.lines.join(' ')).toContain('refusing to sweep recursively');
+    } finally {
+      if (previous === undefined) delete process.env.TRACKWAY_DISTILLING;
+      else process.env.TRACKWAY_DISTILLING = previous;
+    }
+  });
+
+  it('still prints nothing when quiet, which is how the hook runs it', async () => {
+    const io = captureIo();
+    const previous = process.env.TRACKWAY_DISTILLING;
+    process.env.TRACKWAY_DISTILLING = '1';
+
+    try {
+      expect(await syncCommand({ quiet: true }, io)).toBe(0);
+      expect([...io.lines, ...io.errors, ...io.statuses]).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.TRACKWAY_DISTILLING;
+      else process.env.TRACKWAY_DISTILLING = previous;
+    }
   });
 });

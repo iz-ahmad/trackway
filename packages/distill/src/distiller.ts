@@ -2,10 +2,10 @@ import { withDerivedId, type MemoryRecord } from '@trackway/core';
 import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
 import { describeForksForPrompt, forkAlternatives, harvestForks, type HarvestedFork } from './harvest.js';
 import { collapseNearDuplicates } from './dedupe.js';
-import { buildPrompt } from './prompts/extract.js';
+import { buildPrompt, isOwnExtraction } from './prompts/extract.js';
 import { RunnerError, type DistillRunner } from './runner/contract.js';
 import { toRecords } from './runner/validate.js';
-import { markPartial, type Distiller } from './sweep/run.js';
+import { markPartial, markSkipped, type Distiller } from './sweep/run.js';
 
 export interface DistillerOptions {
   runner: DistillRunner;
@@ -183,6 +183,13 @@ export function createDistiller(options: DistillerOptions): Distiller {
 
   return async ({ descriptor, events, fromOffset, onProgress }): Promise<MemoryRecord[] | null> => {
     if (events.length === 0) return null;
+
+    // Our own distillation calls are sessions too, and they were being read
+    // back and sent to the model to discover they hold nothing. Returning null
+    // marks the session handled without spending a call on it.
+    if (isOwnExtraction(events)) {
+      return markSkipped('one of our own distillation calls, not real work');
+    }
 
     // The per-call channel wins when the caller supplies one, because it knows
     // which session this is and the distiller is reused across all of them.

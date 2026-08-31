@@ -55,7 +55,7 @@ export type SweepProgress =
       total: number;
       sessionId: string;
       records: number;
-      outcome: 'distilled' | 'ingest-only' | 'partial' | 'failed';
+      outcome: 'distilled' | 'ingest-only' | 'partial' | 'failed' | 'skipped';
       reason?: string;
     };
 
@@ -126,6 +126,27 @@ export function partialReasons(records: MemoryRecord[] | null): string[] {
   return partialMark(records)?.reasons ?? [];
 }
 
+/**
+ * Marks records from a session the distiller deliberately declined to send.
+ *
+ * Distinct from an adapter that cannot distil, which is what returning null
+ * means. Reporting a skip as "this agent cannot distil" told the reader the
+ * wrong thing about 143 of 151 sessions.
+ */
+export const SKIPPED = Symbol.for('trackway.skippedSession');
+
+export function markSkipped(reason: string): MemoryRecord[] {
+  return Object.defineProperty([] as MemoryRecord[], SKIPPED, {
+    value: reason,
+    enumerable: false,
+  }) as MemoryRecord[];
+}
+
+export function skippedReason(records: MemoryRecord[] | null): string | undefined {
+  const value = records === null ? undefined : (records as unknown as Record<symbol, unknown>)[SKIPPED];
+  return typeof value === 'string' ? value : undefined;
+}
+
 export interface SweptSession {
   sessionId: string;
   adapter: string;
@@ -137,6 +158,8 @@ export interface SweptSession {
   partial?: number;
   /** Why those regions failed. A count alone cannot be acted on. */
   partialReasons?: string[];
+  /** Set when the distiller declined to send this session, and why. */
+  skipped?: string;
 }
 
 export interface SweepFailure {
@@ -293,6 +316,22 @@ export async function runSweep(
           undistilled: true,
         });
         report({ phase: 'done', ...where, records: 0, outcome: 'ingest-only' });
+        recordSuccess(state, key, descriptor, highestOffset, now);
+        await checkpoint();
+        continue;
+      }
+
+      const declined = skippedReason(records);
+      if (declined !== undefined) {
+        await keep({
+          sessionId: descriptor.sessionId,
+          adapter: descriptor.adapter,
+          records: [],
+          eventCount: events.length,
+          undistilled: false,
+          skipped: declined,
+        });
+        report({ phase: 'done', ...where, records: 0, outcome: 'skipped', reason: declined });
         recordSuccess(state, key, descriptor, highestOffset, now);
         await checkpoint();
         continue;

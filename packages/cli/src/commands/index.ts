@@ -21,7 +21,7 @@ import {
   type MemoryRecord,
   type RecordType,
 } from '@trackway/core';
-import { loadState, type SweepProgress } from '@trackway/distill';
+import { defaultRunners, loadState, type SweepProgress } from '@trackway/distill';
 import { alternativeLine, detail, oneLine, shortDate, truncate } from '../format.js';
 import { hookCommand, hookTargets, installHook, isHookInstalled } from '../hook.js';
 import { ingestTranscript, sync } from '../pipeline.js';
@@ -81,6 +81,8 @@ function describeOutcome(event: SweepProgress & { phase: 'done' }): string {
       return `${event.records} record(s), part of it could not be read`;
     case 'failed':
       return `failed: ${truncate(event.reason ?? 'unknown', 80)}`;
+    case 'skipped':
+      return `skipped: ${truncate(event.reason ?? 'nothing worth extracting', 80)}`;
   }
 }
 
@@ -287,12 +289,30 @@ export async function syncCommand(
 
   if (options.quiet) return 0;
 
-  const distilled = result.sweep.swept.filter((s) => !s.undistilled).length;
+  // Not an error and not a sweep: say which, rather than reporting zero
+  // sessions as though there were none to do.
+  if (result.halted) {
+    io.out(`Did not sync: ${result.halted}.`);
+    return 0;
+  }
+
+  const skippedSessions = result.sweep.swept.filter((s) => s.skipped !== undefined);
+  const distilled = result.sweep.swept.filter(
+    (s) => !s.undistilled && s.skipped === undefined,
+  ).length;
   const undistilled = result.sweep.swept.filter((s) => s.undistilled).length;
 
   io.out(`Swept ${result.sweep.swept.length} session(s) in ${formatDuration(Date.now() - startedAt)}.`);
   io.out(`  distilled:   ${distilled}`);
   if (undistilled > 0) io.out(`  ingest only: ${undistilled} (agent cannot distil)`);
+  // Worth its own line rather than being folded into "ingest only": these cost
+  // no model call at all, and saying why keeps the count from looking like
+  // sessions that were dropped.
+  if (skippedSessions.length > 0) {
+    io.out(
+      `  skipped:     ${skippedSessions.length} (${skippedSessions[0]?.skipped ?? 'nothing to extract'})`,
+    );
+  }
   io.out(`  records:     ${result.written} new, ${result.skippedExisting} already present`);
 
   if (result.sweep.deferred > 0) {
@@ -368,6 +388,27 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
         : 'ingest only'
       : `unavailable: ${status.reason ?? 'unknown'}`;
     io.out(`  ${status.id.padEnd(12)} ${state}`);
+  }
+
+  // An adapter being present says a session can be read. It says nothing about
+  // whether anything on this machine can distil it, and that is the failure
+  // people actually hit: sessions pile up and every sweep reports the same
+  // error per session.
+  io.out('\nDistillers:');
+  const runners = await Promise.all(
+    defaultRunners().map(async (runner) => ({
+      id: runner.id,
+      availability: await runner.isAvailable().catch(() => ({ available: false as const })),
+    })),
+  );
+  for (const { id, availability } of runners) {
+    const state = availability.available
+      ? 'ready'
+      : `unavailable: ${truncate('reason' in availability ? (availability.reason ?? 'unknown') : 'unknown', 50)}`;
+    io.out(`  ${id.padEnd(12)} ${state}`);
+  }
+  if (!runners.some((runner) => runner.availability.available)) {
+    io.out('  Nothing here can distil. Sessions will be found but produce no records.');
   }
 
   io.out('\nHooks:');
