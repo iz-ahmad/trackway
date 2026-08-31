@@ -2,7 +2,7 @@ import { describeActor } from '../src/format.js';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +13,7 @@ import {
   forgetCommand,
   hookCommand,
   ingestCommand,
+  initCommand,
   hookTargets,
   installHook,
   isHookInstalled,
@@ -131,6 +132,15 @@ describe('workspace', () => {
     await writeConfig(join(repo, '.trackway'), config);
 
     expect((await readConfig(repo)).quietWindowMinutes).toBe(42);
+  });
+
+  it('prefills the project name from the repository directory at init', async () => {
+    await initCommand({ hook: false }, captureIo());
+
+    const raw = await readFile(join(repo, '.trackway', 'config.yml'), 'utf8');
+
+    expect(raw).toContain(`projectName: ${basename(repo)}`);
+    expect((await readConfig(repo)).projectName).toBe(basename(repo));
   });
 
   it('keeps the event cache outside the repository', async () => {
