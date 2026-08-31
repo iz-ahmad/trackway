@@ -217,3 +217,65 @@ describe('telling a deliberate skip from an agent that cannot distil', () => {
     expect(skippedReason(null)).toBeUndefined();
   });
 });
+
+describe('sizing a chunk by how big the request will be', () => {
+  const sizeOf = (event: MemoryEvent): number => String((event.payload as { content?: string }).content ?? '').length;
+
+  function sized(lengths: number[]): MemoryEvent[] {
+    return lengths.map((n, i) => eventAt(i, 'user_prompt', { content: 'x'.repeat(n) }));
+  }
+
+  /*
+   * Count is the wrong unit and using it caused real timeouts: a 2687-event
+   * session widened to 224 events per chunk produced a first request of 91k
+   * characters, which timed out at 300 seconds twice while an equivalent 41k
+   * request had been measured at 54 seconds.
+   */
+  it('breaks a chunk when the request would get too large', async () => {
+    const { chunkEvents } = await import('../src/index.js');
+
+    const chunks = chunkEvents(sized([400, 400, 400, 400]), {
+      chunkSize: 100,
+      maxChars: 1000,
+      sizeOf,
+    });
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]?.events).toHaveLength(2);
+  });
+
+  it('still breaks on count, so a chunk stays one readable conversation', async () => {
+    const { chunkEvents } = await import('../src/index.js');
+
+    const chunks = chunkEvents(sized([1, 1, 1, 1, 1]), { chunkSize: 2, maxChars: 10_000, sizeOf });
+
+    expect(chunks.map((chunk) => chunk.events.length)).toEqual([2, 2, 1]);
+  });
+
+  // Losing an event is worse than one larger request, and the renderer already
+  // truncates each event, so an oversized one is bounded anyway.
+  it('keeps an event that is bigger than the whole budget', async () => {
+    const { chunkEvents } = await import('../src/index.js');
+
+    const chunks = chunkEvents(sized([50, 5000, 50]), { chunkSize: 100, maxChars: 1000, sizeOf });
+
+    expect(chunks.flatMap((chunk) => chunk.events)).toHaveLength(3);
+  });
+
+  it('covers every event, which is the point of chunking at all', async () => {
+    const { chunkEvents } = await import('../src/index.js');
+
+    const events = sized(Array.from({ length: 300 }, (_, i) => 100 + (i % 7) * 300));
+    const chunks = chunkEvents(events, { chunkSize: 120, maxChars: 4000, sizeOf });
+
+    const covered = new Set(chunks.flatMap((c) => c.events.map((e) => e.source.offset)));
+    expect(covered.size).toBe(300);
+    expect(chunks.every((c) => c.total === chunks.length)).toBe(true);
+  });
+
+  it('bounds by count alone when no size budget is given, as before', async () => {
+    const { chunkEvents } = await import('../src/index.js');
+
+    expect(chunkEvents(sized(Array(250).fill(10)), { chunkSize: 120 })).toHaveLength(3);
+  });
+});

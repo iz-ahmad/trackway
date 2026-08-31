@@ -1,8 +1,8 @@
 import { withDerivedId, type MemoryRecord } from '@trackway/core';
-import { DEFAULT_CHUNK_SIZE, chunkEvents } from './chunk.js';
+import { DEFAULT_CHUNK_SIZE, DEFAULT_MAX_CHUNK_CHARS, chunkEvents } from './chunk.js';
 import { describeForksForPrompt, forkAlternatives, harvestForks, type HarvestedFork } from './harvest.js';
 import { collapseNearDuplicates } from './dedupe.js';
-import { buildPrompt, isOwnExtraction } from './prompts/extract.js';
+import { buildPrompt, isOwnExtraction, renderedSize } from './prompts/extract.js';
 import { RunnerError, type DistillRunner } from './runner/contract.js';
 import { toRecords } from './runner/validate.js';
 import { markPartial, markSkipped, type Distiller } from './sweep/run.js';
@@ -17,6 +17,8 @@ export interface DistillerOptions {
   maxAttempts?: number;
   /** Base delay between attempts. Exposed so tests need not wait it out. */
   retryDelayMs?: number;
+  /** Ceiling on one request's rendered size. Events vary too much to bound by count. */
+  maxChunkChars?: number;
   onProgress?: (message: string) => void;
 }
 
@@ -217,13 +219,16 @@ export function createDistiller(options: DistillerOptions): Distiller {
     const requested = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
     const chunkSize = Math.max(requested, Math.ceil(events.length / cap));
 
-    const batch = chunkEvents(events, { chunkSize });
-
-    if (chunkSize > requested) {
-      report(
-        `session ${descriptor.sessionId}: ${events.length} events, widening chunks to ${chunkSize} to cover it in ${batch.length} calls`,
-      );
-    }
+    // Two ceilings. Widening by count alone put 91k characters into one request
+    // on a 2687-event session, which timed out at 300 seconds twice and lost
+    // eleven minutes to a chunk that never landed. The same events split by
+    // size cost about the same in total, because it is the same transcript
+    // either way, and no single call sits near the limit.
+    const batch = chunkEvents(events, {
+      chunkSize,
+      maxChars: options.maxChunkChars ?? DEFAULT_MAX_CHUNK_CHARS,
+      sizeOf: renderedSize,
+    });
 
     const records: MemoryRecord[] = [];
     const failures: unknown[] = [];

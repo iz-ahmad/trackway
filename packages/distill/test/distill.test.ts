@@ -629,28 +629,6 @@ describe('chunking a long session', () => {
     expect(seen.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(400);
   });
 
-  it('reports when it widens rather than doing it silently', async () => {
-    const messages: string[] = [];
-    const runner: DistillRunner = {
-      id: 'stub',
-      async isAvailable() {
-        return { available: true };
-      },
-      async run() {
-        return JSON.stringify({});
-      },
-    };
-
-    await createDistiller({
-      runner,
-      chunkSize: 20,
-      maxChunks: 2,
-      onProgress: (m) => messages.push(m),
-    })({ descriptor, events: eventsN(400), fromOffset: -1 });
-
-    expect(messages.join(' ')).toContain('widening chunks');
-  });
-
   it('covers every event of a long session across its chunks', () => {
     const events = eventsN(2100);
     const chunkSize = Math.max(120, Math.ceil(events.length / 12));

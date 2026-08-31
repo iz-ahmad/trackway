@@ -174,6 +174,16 @@ export interface PromptInput {
  * Each event is truncated. Whole tool outputs can run to tens of thousands of
  * characters, and the decision-bearing content is almost always near the start.
  */
+/**
+ * How much of a request one event will take up.
+ *
+ * Asked of the renderer rather than estimated, because events vary by orders of
+ * magnitude and a guess is what put 91k characters into a chunk sized by count.
+ */
+export function renderedSize(event: MemoryEvent): number {
+  return renderTranscript([event]).length + 2;
+}
+
 export function renderTranscript(events: readonly MemoryEvent[]): string {
   return events
     .map((event) => {
