@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { InvalidTranscriptError, defaultRegistry } from '@trackway/adapters';
 import {
   TrackwayConfig,
@@ -222,11 +222,12 @@ export async function initCommand(options: { hook?: boolean }, io: Io = consoleI
   const workspace = await requireWorkspace(io);
   if (!workspace) return 1;
 
-  await writeConfig(workspace.storeDir, TrackwayConfig.parse({}));
+  await writeConfig(workspace.storeDir, TrackwayConfig.parse({ projectName: basename(workspace.repoRoot) }));
   const ignore = await ensureIgnoreRules(workspace.storeDir);
 
   io.out(`Initialized Trackway in ${workspace.storeDir}`);
   io.out(`  config:      ${workspace.config.storePath}/config.yml`);
+  io.out(`  project name:        ${basename(workspace.repoRoot)} (projectName in config.yml, edit freely)`);
   io.out(`  records:     ${workspace.config.storePath}/records/  (tracked by git)`);
   io.out(`  index:       ${workspace.config.storePath}/index.sqlite  (${ignore === 'created' ? 'now ignored' : 'already ignored'})`);
   io.out(`  event cache: outside the repo, purged after ${workspace.config.cacheRetentionDays} days`);
