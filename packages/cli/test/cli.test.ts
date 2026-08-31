@@ -1,6 +1,6 @@
 import { describeActor } from '../src/format.js';
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,8 @@ import {
   sweepReporter,
   syncCommand,
   acquireSyncLock,
+  installGitHook,
+  isGitHookInstalled,
   showCommand,
   whyCommand,
   writeConfig,
@@ -1028,5 +1030,76 @@ describe('a sync started from inside a distillation', () => {
       if (previous === undefined) delete process.env.TRACKWAY_DISTILLING;
       else process.env.TRACKWAY_DISTILLING = previous;
     }
+  });
+});
+
+describe('syncing for agents that have no hook of their own', () => {
+  /*
+   * Claude Code is the only agent exposing a lifecycle hook. A repository
+   * worked on entirely through Codex or OpenCode never synced by itself. A
+   * commit is the agent-agnostic signal, and it is already the moment records
+   * are linked to.
+   */
+  it('installs a post-commit hook where git actually looks for one', async () => {
+    const result = await installGitHook(repo);
+
+    expect(result.status).toBe('installed');
+    expect(await isGitHookInstalled(repo)).toBe(true);
+
+    const body = await readFile(join(repo, '.git', 'hooks', 'post-commit'), 'utf8');
+    expect(body).toContain('trackway sync --quiet');
+    expect(body.startsWith('#!')).toBe(true);
+  });
+
+  it('makes it executable, or git ignores it', async () => {
+    await installGitHook(repo);
+    const { mode } = await stat(join(repo, '.git', 'hooks', 'post-commit'));
+
+    expect(mode & 0o111).not.toBe(0);
+  });
+
+  // A repository with a post-commit hook has it for a reason. Replacing it
+  // would be the worst thing this could do.
+  it('keeps a hook that is already there', async () => {
+    const path = join(repo, '.git', 'hooks', 'post-commit');
+    await writeFile(path, '#!/bin/sh\necho "existing hook"\n', { mode: 0o755 });
+
+    const result = await installGitHook(repo);
+
+    expect(result.status).toBe('appended');
+    const body = await readFile(path, 'utf8');
+    expect(body).toContain('echo "existing hook"');
+    expect(body).toContain('trackway sync --quiet');
+  });
+
+  it('does not install itself twice', async () => {
+    await installGitHook(repo);
+    expect((await installGitHook(repo)).status).toBe('already-present');
+
+    const body = await readFile(join(repo, '.git', 'hooks', 'post-commit'), 'utf8');
+    expect(body.match(/trackway sync --quiet/g)).toHaveLength(1);
+  });
+
+  // Asked of git rather than assumed: a worktree puts hooks elsewhere, and a
+  // repository using husky sets core.hooksPath. Writing to the wrong place
+  // installs a hook that never runs and reports success.
+  it('follows core.hooksPath rather than assuming .git/hooks', async () => {
+    const custom = join(repo, '.husky');
+    await mkdir(custom, { recursive: true });
+    await run('git', ['config', 'core.hooksPath', '.husky'], { cwd: repo });
+
+    const result = await installGitHook(repo);
+
+    expect(result.path).toContain('.husky');
+    expect(await readFile(join(custom, 'post-commit'), 'utf8')).toContain('trackway sync --quiet');
+  });
+
+  it('does not run trackway when it is not on the path', async () => {
+    await installGitHook(repo);
+    const body = await readFile(join(repo, '.git', 'hooks', 'post-commit'), 'utf8');
+
+    // A hook that errors on every commit for someone who uninstalled trackway
+    // is worse than no hook.
+    expect(body).toContain('command -v trackway');
   });
 });

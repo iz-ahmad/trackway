@@ -23,7 +23,14 @@ import {
 } from '@trackway/core';
 import { defaultRunners, loadState, type SweepProgress } from '@trackway/distill';
 import { alternativeLine, detail, oneLine, shortDate, truncate } from '../format.js';
-import { hookCommand, hookTargets, installHook, isHookInstalled } from '../hook.js';
+import {
+  hookCommand,
+  hookTargets,
+  installGitHook,
+  installHook,
+  isGitHookInstalled,
+  isHookInstalled,
+} from '../hook.js';
 import { ingestTranscript, sync } from '../pipeline.js';
 import { createProgress, formatDuration, type ProgressOptions } from '../progress.js';
 import {
@@ -249,6 +256,19 @@ export async function initCommand(options: { hook?: boolean }, io: Io = consoleI
     return 0;
   }
 
+  // Claude Code is the only agent with a lifecycle hook, so a repository worked
+  // on through Codex or OpenCode never synced on its own. A commit fires
+  // whichever agent did the work, and it is already the moment the records are
+  // linked to.
+  io.out('');
+  const git = await installGitHook(workspace.repoRoot);
+  if (git.status === 'installed' || git.status === 'appended') {
+    io.out(`Git hook ${git.status === 'appended' ? 'added to' : 'installed at'} ${git.path}`);
+    io.out('This repository syncs on every commit, whichever agent did the work.');
+  } else if (git.status === 'failed') {
+    io.err(`Could not install the git hook: ${git.reason ?? 'unknown'}`);
+  }
+
   io.out('');
   for (const target of hookTargets()) {
     if (await isHookInstalled(target)) {
@@ -415,6 +435,10 @@ export async function statusCommand(_options: unknown, io: Io = consoleIo): Prom
   for (const target of hookTargets()) {
     io.out(`  ${target.agent.padEnd(12)} ${(await isHookInstalled(target)) ? 'installed' : 'not installed'}`);
   }
+  // The one that covers the agents with no hook of their own.
+  io.out(
+    `  ${'git commit'.padEnd(12)} ${(await isGitHookInstalled(workspace.repoRoot)) ? 'installed' : 'not installed'}`,
+  );
 
   // A session that went quiet and never got distilled is the symptom of a
   // broken trigger. Reporting it is what turns silent breakage into visible.

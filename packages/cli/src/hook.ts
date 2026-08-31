@@ -1,6 +1,10 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { chmod, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+
+const run = promisify(execFile);
 
 export const HOOK_MARKER = 'trackway sync';
 
@@ -86,4 +90,104 @@ export async function isHookInstalled(target: HookTarget): Promise<boolean> {
 /** The command the hook runs. Detached and silent, so it cannot block a session. */
 export function hookCommand(): string {
   return 'trackway sync --quiet &';
+}
+
+/**
+ * The git hook, for the agents that have no hook of their own.
+ *
+ * Claude Code is the only agent that exposes a lifecycle hook, so a Codex or
+ * OpenCode session only ever synced when the developer happened to run a
+ * Trackway command. A repository worked on entirely through those agents never
+ * synced at all.
+ *
+ * A commit is the agent-agnostic signal. It fires whichever agent did the work,
+ * or none, and it is already the moment Trackway cares about: records are
+ * linked to the commits their work produced, so syncing at commit time is when
+ * that link is freshest.
+ */
+export const GIT_HOOK_MARKER = '# trackway: sweep sessions that have gone quiet';
+
+const GIT_HOOK_BODY = `${GIT_HOOK_MARKER}
+command -v trackway >/dev/null 2>&1 && trackway sync --quiet &
+`;
+
+export interface GitHookResult {
+  path: string;
+  status: 'installed' | 'already-present' | 'appended' | 'failed';
+  reason?: string;
+}
+
+/**
+ * Where this repository keeps its hooks.
+ *
+ * Asked of git rather than assumed to be `.git/hooks`: a worktree puts them
+ * elsewhere, and a repository using husky sets `core.hooksPath`. Writing to the
+ * wrong directory would install a hook that never runs and report success.
+ */
+export async function gitHooksDir(repoRoot: string): Promise<string | null> {
+  try {
+    const { stdout } = await run('git', ['rev-parse', '--git-path', 'hooks'], { cwd: repoRoot });
+    const path = stdout.trim();
+    if (!path) return null;
+    return path.startsWith('/') ? path : join(repoRoot, path);
+  } catch {
+    return null;
+  }
+}
+
+export async function isGitHookInstalled(repoRoot: string): Promise<boolean> {
+  const dir = await gitHooksDir(repoRoot);
+  if (!dir) return false;
+
+  try {
+    return (await readFile(join(dir, 'post-commit'), 'utf8')).includes(GIT_HOOK_MARKER);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Adds the sweep to `post-commit`, keeping whatever was already there.
+ *
+ * Appending rather than replacing, because a repository that already has a
+ * post-commit hook has it for a reason, and silently dropping somebody's hook
+ * to install our own would be the worst thing this could do.
+ */
+export async function installGitHook(repoRoot: string): Promise<GitHookResult> {
+  const dir = await gitHooksDir(repoRoot);
+  if (!dir) {
+    return { path: '', status: 'failed', reason: 'not a git repository' };
+  }
+
+  const path = join(dir, 'post-commit');
+
+  let existing: string | null = null;
+  try {
+    existing = await readFile(path, 'utf8');
+  } catch {
+    // No hook yet, which is the common case.
+  }
+
+  if (existing?.includes(GIT_HOOK_MARKER)) {
+    return { path, status: 'already-present' };
+  }
+
+  try {
+    await mkdir(dir, { recursive: true });
+
+    if (existing === null) {
+      await writeFile(path, `#!/bin/sh\n${GIT_HOOK_BODY}`, { encoding: 'utf8', mode: 0o755 });
+      return { path, status: 'installed' };
+    }
+
+    await writeFile(path, `${existing.trimEnd()}\n\n${GIT_HOOK_BODY}`, 'utf8');
+    await chmod(path, 0o755);
+    return { path, status: 'appended' };
+  } catch (error) {
+    return {
+      path,
+      status: 'failed',
+      reason: String(error instanceof Error ? error.message : error),
+    };
+  }
 }
