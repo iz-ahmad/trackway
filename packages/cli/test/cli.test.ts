@@ -2,7 +2,8 @@ import { describeActor } from '../src/format.js';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -683,5 +684,21 @@ describe('ingesting a transcript from an agent with no adapter', () => {
 
     expect(await ingestCommand(join(repo, 'absent.json'), {}, io)).toBe(1);
     expect(io.errors.join('\n')).toContain('absent.json');
+  });
+});
+
+describe('reported version', () => {
+  it('matches the version the package publishes', async () => {
+    // The bundle takes its version from packages/cli/package.json while
+    // `--version` prints a literal in bin.ts. Nothing forces the two to agree,
+    // and v0.2.0 shipped only because this was caught by hand during release.
+    const here = dirname(fileURLToPath(import.meta.url));
+    const manifest = JSON.parse(
+      await readFile(join(here, '..', 'package.json'), 'utf8'),
+    ) as { version: string };
+    const source = await readFile(join(here, '..', 'src', 'bin.ts'), 'utf8');
+
+    const declared = /\.version\('([^']+)'\)/.exec(source)?.[1];
+    expect(declared).toBe(manifest.version);
   });
 });
