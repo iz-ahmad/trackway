@@ -1,0 +1,67 @@
+name: Publish to npm
+
+# A published GitHub release is the trigger, so the tag and the notes exist
+# before anything reaches the registry. npm cannot be un-published after 72
+# hours, so everything that can fail runs before the publish step.
+#
+# workflow_dispatch is here to re-run a release whose publish failed. The tag
+# already exists in that case, and re-cutting the release to retry would be
+# the wrong shape.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish, for retrying a release that failed
+        required: true
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing (OIDC). No stored token to expire.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer. The runner ships older.
+      - name: Use an npm that can publish over OIDC
+        run: npm install -g npm@latest
+
+      - run: npm ci
+
+      # The tag is the release's claim about what it contains. If the manifest
+      # disagrees, the registry gets a version nobody tagged, which is the
+      # failure this whole ordering exists to prevent.
+      - name: Tag matches the manifest
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          manifest="v$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::tag $tag does not match manifest $manifest"
+            exit 1
+          fi
+          echo "$tag matches the manifest"
+
+      - run: npm run typecheck
+      - run: npm test
+
+      - run: npm run build:package
+
+      # Installs the tarball the way a user would and then uses it: initialises
+      # a repository, reads a rejected option back, serves the explorer, and
+      # confirms the stylesheet and fonts resolve in the published layout.
+      - run: npm run verify:package
+
+      - name: Publish
+        run: npm publish
+        working-directory: packages/cli/npm
