@@ -124,14 +124,15 @@ Work with your agent normally. There are no commands to run during a session.
 
 ### Open the explorer
 
-This is the fastest way to see what Trackway has. Two commands:
+This is the fastest way to see what Trackway has. Three commands, and you only run the first once per repository:
 
 ```bash
+trackway init     # set up this repository
 trackway sync     # turn finished sessions into records
 trackway graph    # open the explorer in your browser
 ```
 
-`sync` reads every session your agent has finished with and distils it into records. `graph` then serves the explorer at `http://127.0.0.1:7777` and opens your browser there. Press Ctrl+C to stop it.
+`init` writes the config and adds the ignore rules that keep the search index out of git. It also offers to install the hook, which is what makes records accumulate on their own. `sync` reads every session your agent has finished with and distils it into records. `graph` then serves the explorer at `http://127.0.0.1:7777` and opens your browser there. Press Ctrl+C to stop it.
 
 Nothing leaves your machine. No account, no network calls, no telemetry.
 
@@ -148,7 +149,7 @@ It serves three views, and the screenshot at the top of this page is the second 
 
 All three share one rail of filters. Records are sorted into four kinds (*product*, *technical*, *your call*, and *working*), and only the first three are shown by default. On a real session that is 18 records out of 101.
 
-**If the explorer looks empty,** you have no records yet. Run `trackway sync` first. If that still finds nothing, run `trackway status` to see which agents Trackway found and what it is waiting on. A session has to go quiet before Trackway will distil it, so a conversation you are still in the middle of will not appear.
+**If the explorer looks empty,** you have no records yet. Check that you ran `trackway init` in this repository, then `trackway sync`. If that still finds nothing, run `trackway status` to see which agents Trackway found and what it is waiting on. A session has to go quiet before Trackway will distil it, so a conversation you are still in the middle of will not appear.
 
 ### Ask from the terminal
 
